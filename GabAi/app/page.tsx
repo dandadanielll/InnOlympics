@@ -57,7 +57,7 @@ export default function LandingPage() {
           right: 0,
           bottom: 0,
           background: `
-            radial-gradient(ellipse 150% 80% at 50% 100%, rgba(242,236,220,1) 52%, rgba(242,236,220,0) 62%)
+            radial-gradient(ellipse 150% 100% at 50% 100%, rgba(242,236,220,1) 40%, rgba(242,236,220,0.8) 55%, rgba(242,236,220,0) 80%)
           `,
           zIndex: -1,
         }} />
