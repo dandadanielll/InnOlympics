@@ -117,7 +117,7 @@ export default function Sidebar() {
             : 'bg-[#f2ecdc]/80 backdrop-blur-xl border border-[#510400]/20 shadow-2xl') + ' rounded-full px-10 py-4 max-w-5xl gap-8'
           : (pathname === '/navigator/before'
             ? 'border-none'
-            : 'backdrop-blur-sm border border-[rgba(81,4,0,0.06)]') + ' px-10 py-8 w-full max-w-7xl gap-12'
+            : 'backdrop-blur-sm border-b border-[rgba(81,4,0,0.06)]') + ` px-10 py-8 w-full ${pathname === '/' ? 'max-w-full' : 'max-w-7xl'} gap-12`
           }`}
         style={{
           display: 'flex',
@@ -130,57 +130,72 @@ export default function Sidebar() {
           })
         }}
       >
-        {/* Logo Section */}
-        <Link href="/" className="flex items-center gap-4 transition-all duration-700 cursor-pointer group">
-          <img
-            src="/GabAI-logo.png"
-            alt="GabAI Logo"
-            className={`transition-all duration-700 object-contain ${scrolled ? "h-10" : "h-14"}`}
+        {/* Elongated Blur Extension for Landing Page */}
+        {!scrolled && pathname === '/' && (
+          <div 
+            className="absolute top-0 left-0 right-0 h-[240px] -z-10 backdrop-blur-md"
+            style={{
+              background: 'linear-gradient(to bottom, rgba(242,236,220,0.4) 0%, rgba(242,236,220,0.2) 40%, rgba(242,236,220,0) 100%)',
+              maskImage: 'linear-gradient(to bottom, black 0%, black 60%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 60%, transparent 100%)'
+            }}
           />
-          <h1 className={`logo-container transition-all duration-700 ${scrolled ? "text-2xl mt-0.5" : "text-4xl"}`}>
-            <span className="logo-gab">Gab</span>
-            <span className="logo-ai">AI</span>
-          </h1>
-        </Link>
+        )}
 
-        {/* Navigation Tabs */}
-        <ul
-          className={`hidden md:flex items-center transition-all duration-700 ${scrolled ? "gap-14" : "gap-20"}`}
-          style={{ display: 'flex', alignItems: 'center', listStyle: 'none', margin: 0, padding: 0 }}
-        >
-          {links.map((link) => (
-            <li
-              key={link.name}
-              ref={(el) => { navItemRefs.current[link.href] = el; }}
-              className="relative"
-              onMouseEnter={() => handleTabEnter(link.href)}
-              onMouseLeave={handleLeave}
-            >
-              <Link
-                href={link.href}
-                className={`font-black uppercase tracking-[0.2em] transition-colors relative group py-2 whitespace-nowrap cursor-pointer bg-transparent border-none outline-none block ${scrolled ? "text-[10px]" : "text-[11px]"} ${openDropdown === link.href || pathname.startsWith(link.href)
-                  ? "text-[#510400]"
-                  : "text-[#3d1b11] hover:text-[#510400]"
-                  }`}
-              >
-                {link.name}
-                <span className={`absolute bottom-0 left-0 h-0.5 bg-[#510400] transition-all duration-300 ${openDropdown === link.href || pathname.startsWith(link.href)
-                  ? "w-full"
-                  : "w-0 group-hover:w-full"
-                  }`}></span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-
-        {/* Action Button */}
-        <div className="flex items-center gap-2">
-          <Link
-            href="/onboarding"
-            className={`bg-[#510400] text-white font-black uppercase tracking-widest hover:bg-[#5d1b1a] transition-all duration-700 shadow-xl hover:-translate-y-0.5 whitespace-nowrap ${scrolled ? "px-6 py-3 text-[10px] rounded-2xl" : "px-8 py-4 text-[11px] rounded-[30px]"}`}
-          >
-            Get Started
+        {/* Content Wrapper to maintain position while nav expands */}
+        <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
+          {/* Logo Section */}
+          <Link href="/" className="flex items-center gap-4 transition-all duration-700 cursor-pointer group">
+            <img
+              src="/GabAI-logo.png"
+              alt="GabAI Logo"
+              className={`transition-all duration-700 object-contain ${scrolled ? "h-10" : "h-14"}`}
+            />
+            <h1 className={`logo-container transition-all duration-700 ${scrolled ? "text-2xl mt-0.5" : "text-4xl"}`}>
+              <span className="logo-gab">Gab</span>
+              <span className="logo-ai">AI</span>
+            </h1>
           </Link>
+
+          {/* Navigation Tabs */}
+          <ul
+            className={`hidden md:flex items-center transition-all duration-700 ${scrolled ? "gap-14" : "gap-20"}`}
+            style={{ display: 'flex', alignItems: 'center', listStyle: 'none', margin: 0, padding: 0 }}
+          >
+            {links.map((link) => (
+              <li
+                key={link.name}
+                ref={(el) => { navItemRefs.current[link.href] = el; }}
+                className="relative"
+                onMouseEnter={() => handleTabEnter(link.href)}
+                onMouseLeave={handleLeave}
+              >
+                <Link
+                  href={link.href}
+                  className={`font-black uppercase tracking-[0.2em] transition-colors relative group py-2 whitespace-nowrap cursor-pointer bg-transparent border-none outline-none block ${scrolled ? "text-[10px]" : "text-[11px]"} ${openDropdown === link.href || pathname.startsWith(link.href)
+                    ? "text-[#510400]"
+                    : "text-[#3d1b11] hover:text-[#510400]"
+                    }`}
+                >
+                  {link.name}
+                  <span className={`absolute bottom-0 left-0 h-0.5 bg-[#510400] transition-all duration-300 ${openDropdown === link.href || pathname.startsWith(link.href)
+                    ? "w-full"
+                    : "w-0 group-hover:w-full"
+                    }`}></span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          {/* Action Button */}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/onboarding"
+              className={`bg-[#510400] text-white font-black uppercase tracking-widest hover:bg-[#5d1b1a] transition-all duration-700 shadow-xl hover:-translate-y-0.5 whitespace-nowrap ${scrolled ? "px-6 py-3 text-[10px] rounded-2xl" : "px-8 py-4 text-[11px] rounded-[30px]"}`}
+            >
+              Get Started
+            </Link>
+          </div>
         </div>
 
         {/* Dropdown Sub-Nav — positioned under active tab */}
