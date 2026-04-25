@@ -155,7 +155,7 @@ function MiniOSMMap({ userLat, userLng, destQuery, destName }: { userLat: number
         // 1. Geocode with Nominatim (clean up query for better hits)
         const cleanQuery = destQuery.replace(/near me/gi, '').replace(/branch/gi, '').trim()
         let nomUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=1`
-        
+
         const limitDist = 0.05 // about 5km bbox
         const viewbox = `${userLng - limitDist},${userLat + limitDist},${userLng + limitDist},${userLat - limitDist}`
         nomUrl += `&viewbox=${viewbox}&bounded=1`
@@ -190,7 +190,7 @@ function MiniOSMMap({ userLat, userLng, destQuery, destName }: { userLat: number
             const osrmRes = await fetch(osrmUrl)
             const osrmData = await osrmRes.json()
             if (osrmData.code === 'Ok' && osrmData.routes?.length) {
-               routeCoords = osrmData.routes[0].geometry.coordinates.map((c: any) => [c[1], c[0]])
+              routeCoords = osrmData.routes[0].geometry.coordinates.map((c: any) => [c[1], c[0]])
             }
           } catch (_err) {
             // ignore routing error and just plot markers
@@ -205,7 +205,7 @@ function MiniOSMMap({ userLat, userLng, destQuery, destName }: { userLat: number
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '&copy; OpenStreetMap' }).addTo(map)
 
         L.circleMarker([userLat, userLng], { radius: 8, color: '#fff', fillColor: 'var(--primary)', fillOpacity: 1, weight: 2 }).addTo(map).bindPopup('<strong>Inyong Lokasyon</strong>')
-        
+
         if (destLat !== null && destLng !== null) {
           const destIcon = L.divIcon({ html: `<div style="background:var(--primary);color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap">${destName.split(' ')[0]}</div>`, className: '', iconAnchor: [0, 0] })
           L.marker([destLat, destLng], { icon: destIcon }).addTo(map).bindPopup(`<strong>${destName}</strong><br/>${foundName}`)
@@ -219,7 +219,7 @@ function MiniOSMMap({ userLat, userLng, destQuery, destName }: { userLat: number
         } else {
           map.setView([userLat, userLng], 14)
         }
-        
+
         mapRef.current = map
         setLoading(false)
       } catch (err: any) {
@@ -344,7 +344,7 @@ export function DocumentChecklist({
                 {/* Directions section (only if has a destination) */}
                 {d.destQuery && (
                   <div style={{ background: '#f9f7f4', padding: '14px', borderRadius: '10px', marginTop: '8px' }}>
-                    
+
                     {/* Action buttons */}
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
                       <button
@@ -354,7 +354,7 @@ export function DocumentChecklist({
                         <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
                         {showingMap ? 'Itago ang Mapa' : 'Tingnan ang Mapa (OSM)'}
                       </button>
-                      
+
                       <a
                         href={buildOSMUrl(d.destQuery)}
                         target="_blank"
