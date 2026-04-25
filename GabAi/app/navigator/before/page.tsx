@@ -36,7 +36,7 @@ export default function BeforePage() {
         <div className="section-eyebrow" style={{ marginBottom: '8px' }}>Phase 1 · Handa Ka Na Ba?</div>
         <h1 className="text-h1" style={{ marginBottom: '16px' }}>Preparation Companion</h1>
         <p className="text-body text-secondary" style={{ maxWidth: '600px' }}>
-          Describe your concern below. GabAi will process your symptoms and generate a complete care plan — a routed facility, a documents checklist, and a doctor consultation script.
+          Describe your concern below. GabAI will process your symptoms and generate a complete care plan — a routed facility, a documents checklist, and a doctor consultation script.
         </p>
 
         {/* INPUT AREA */}

@@ -4,14 +4,14 @@ import Sidebar from './components/Sidebar'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'GabAi — Health Navigation Guide',
+  title: 'GabAI — Health Navigation Guide',
   description: 'Navigate the Philippine healthcare system with confidence. Guided by AI.',
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#7e2625',
+  themeColor: '#510400',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,500;1,600&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Merriweather:ital,wght@1,700&family=Open+Sans:wght@800&display=swap"
           rel="stylesheet"
         />
       </head>
