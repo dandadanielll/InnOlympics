@@ -1,36 +1,58 @@
 'use client'
 
 import { useState } from 'react'
-
-const WHATSAPP_TEXT = `*VISIT SUMMARY — GabAi*
-Date: April 25, 2026
-Facility: QC BHC
-
-*Doctor's notes:*
-Viral infection. Rest and symptomatic treatment.
-
-*Medications:*
-- Paracetamol Syrup 250mg — every 6 hours`
+import { useRouter } from 'next/navigation'
+import { useGabAiStore } from '@/lib/store'
 
 export default function AfterPage() {
+  const router = useRouter()
+  const { getLatestEncounter, updateEncounter, createEncounter } = useGabAiStore()
+  const encounter = getLatestEncounter()
+
   const [followUp, setFollowUp] = useState<'improving' | 'same' | 'worse' | null>(null)
   const [logDone, setLogDone] = useState(false)
   const [shared, setShared] = useState(false)
+
+  // Build WhatsApp summary from real encounter data when available
+  const facility = encounter?.carePlan?.recommendedFacility ?? 'Health Facility'
+  const medications = encounter?.toRemember.length
+    ? encounter.toRemember.map((n) => `- ${n}`).join('\n')
+    : '- See prescription from doctor'
+  const visitDate = encounter?.updatedAt
+    ? new Date(encounter.updatedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+    : new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+
+  const WHATSAPP_TEXT = `*VISIT SUMMARY — GabAi*\nDate: ${visitDate}\nFacility: ${facility}\n\n*Doctor's notes:*\nViral infection. Rest and symptomatic treatment.\n\n*Medications:*\n${medications}`
 
   const handleShare = () => {
     window.open(`https://wa.me/?text=${encodeURIComponent(WHATSAPP_TEXT)}`, '_blank')
     setShared(true)
   }
 
+  const handleFollowUpSave = (val: 'improving' | 'same' | 'worse') => {
+    setFollowUp(val)
+    if (encounter) {
+      updateEncounter(encounter.id, {
+        followUpStatus: val === 'improving' ? 'improving' : val === 'worse' ? 'flagged' : 'pending',
+      })
+    }
+  }
+
+  const handleStartNew = () => {
+    createEncounter()
+    router.push('/navigator/before')
+  }
+
   return (
     <div style={{ maxWidth: 'var(--content-max)', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '48px' }}>
-      
+
       {/* 0. OVERVIEW */}
       <div>
         <div className="section-eyebrow" style={{ marginBottom: '8px' }}>Phase 3 · Uwi Ka Na</div>
-        <h1 className="text-h1" style={{ marginBottom: '16px' }}>Post-Visit & Follow-up</h1>
+        <h1 className="text-h1" style={{ marginBottom: '16px' }}>Post-Visit &amp; Follow-up</h1>
         <p className="text-body text-secondary" style={{ maxWidth: '600px' }}>
-          Share your visit summary with family, log your experience to help the community, and let GabAi track your recovery and remember this encounter for next time.
+          Share your visit summary with family, log your experience to help the community, and let GabAi track your recovery
+          and remember this encounter for next time.
         </p>
       </div>
 
@@ -40,7 +62,7 @@ export default function AfterPage() {
       <div id="share" className="feature-anchor">
         <div className="section-eyebrow" style={{ color: '#25d366', marginBottom: '8px' }}>1. Communication</div>
         <h2 className="text-h2" style={{ marginBottom: '24px' }}>Share with Family</h2>
-        
+
         <div className="card" style={{ maxWidth: '700px', borderTop: '4px solid #25d366' }}>
           <div className="card-body">
             <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-sm)', padding: '16px', fontSize: '0.875rem', lineHeight: 1.7, color: '#166534', marginBottom: '24px', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
@@ -49,12 +71,14 @@ export default function AfterPage() {
             {!shared ? (
               <button className="btn btn-primary" style={{ background: '#25d366', width: '100%' }} onClick={handleShare}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
                 </svg>
                 Send via WhatsApp
               </button>
             ) : (
-              <div className="text-sm font-semibold" style={{ color: '#25d366', textAlign: 'center' }}>
+              <div className="text-sm" style={{ fontWeight: 600, color: '#25d366', textAlign: 'center' }}>
                 Shared successfully.
               </div>
             )}
@@ -68,7 +92,7 @@ export default function AfterPage() {
       <div id="followup" className="feature-anchor">
         <div className="section-eyebrow" style={{ color: 'var(--primary)', marginBottom: '8px' }}>2. Recovery Tracking</div>
         <h2 className="text-h2" style={{ marginBottom: '24px' }}>24-48 Hour Check-in</h2>
-        
+
         <div className="card" style={{ maxWidth: '700px' }}>
           <div className="card-body">
             <p className="text-sm text-secondary" style={{ marginBottom: '24px' }}>
@@ -77,14 +101,13 @@ export default function AfterPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
               {[
                 { val: 'improving' as const, label: 'Improving — Getting better', color: 'var(--success)' },
-                { val: 'same' as const,      label: 'No change — About the same', color: 'var(--warning)' },
-                { val: 'worse' as const,     label: 'Worsening — Condition declined', color: 'var(--danger)' },
+                { val: 'same' as const, label: 'No change — About the same', color: 'var(--warning)' },
+                { val: 'worse' as const, label: 'Worsening — Condition declined', color: 'var(--danger)' },
               ].map((opt) => (
                 <div
                   key={opt.val}
-                  className={`radio-card ${followUp === opt.val ? 'selected' : ''}`}
                   style={{ border: `2px solid ${followUp === opt.val ? opt.color : 'var(--border)'}`, padding: '16px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer' }}
-                  onClick={() => setFollowUp(opt.val)}
+                  onClick={() => handleFollowUpSave(opt.val)}
                 >
                   <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: followUp === opt.val ? opt.color : 'transparent', border: `2px solid ${opt.color}` }} />
                   <span className="text-sm" style={{ fontWeight: 600 }}>{opt.label}</span>
@@ -93,8 +116,8 @@ export default function AfterPage() {
             </div>
 
             {followUp === 'improving' && <div className="info-box"><span className="text-sm">Great — continue as prescribed and rest.</span></div>}
-            {followUp === 'same'      && <div className="warn-box" style={{ background: 'var(--warning-bg)', borderLeftColor: 'var(--warning)' }}><span className="text-sm" style={{ color: 'var(--warning)' }}>Monitor closely. Return if no improvement tomorrow.</span></div>}
-            {followUp === 'worse'     && <div className="warn-box"><span className="text-sm">Return to facility immediately for reassessment.</span></div>}
+            {followUp === 'same' && <div className="warn-box" style={{ background: 'var(--warning-bg)', borderLeftColor: 'var(--warning)' }}><span className="text-sm" style={{ color: 'var(--warning)' }}>Monitor closely. Return if no improvement tomorrow.</span></div>}
+            {followUp === 'worse' && <div className="warn-box"><span className="text-sm">Return to facility immediately for reassessment.</span></div>}
           </div>
         </div>
       </div>
@@ -105,7 +128,7 @@ export default function AfterPage() {
       <div id="experience" className="feature-anchor">
         <div className="section-eyebrow" style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>3. Future Patients</div>
         <h2 className="text-h2" style={{ marginBottom: '24px' }}>Community Experience Log</h2>
-        
+
         <div className="card" style={{ maxWidth: '700px' }}>
           <div className="card-body">
             {!logDone ? (
@@ -115,13 +138,24 @@ export default function AfterPage() {
                 </p>
                 <div style={{ marginBottom: '16px' }}>
                   <label className="section-eyebrow" style={{ display: 'block', marginBottom: '8px' }}>Wait Time</label>
-                  <select className="input select">
+                  <select className="input">
                     <option>Under 30 min</option>
                     <option>1–2 hours</option>
                     <option>5+ hours</option>
                   </select>
                 </div>
-                <button className="btn btn-primary" style={{ width: '100%', marginTop: '12px' }} onClick={() => setLogDone(true)}>
+                <button
+                  className="btn btn-primary"
+                  style={{ width: '100%', marginTop: '12px' }}
+                  onClick={() => {
+                    if (encounter) {
+                      updateEncounter(encounter.id, {
+                        communityRating: { waitTime: 30, doctorHelpful: true, turnedAway: false, rating: 4 },
+                      })
+                    }
+                    setLogDone(true)
+                  }}
+                >
                   Submit Anonymous Log
                 </button>
               </>
@@ -139,9 +173,13 @@ export default function AfterPage() {
           <div className="card-body">
             <h3 className="text-h3" style={{ color: '#fff', marginBottom: '8px' }}>Saved to Alaala Ko</h3>
             <p className="text-sm" style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '16px' }}>
-              This encounter is stored. Your next visit will begin with this context already loaded.
+              This encounter is stored locally. Your next visit will begin with this context already loaded.
             </p>
-            <button className="btn btn-secondary" style={{ width: '100%', background: 'rgba(255,255,255,0.1)', color: '#fff', borderColor: 'transparent' }}>
+            <button
+              className="btn btn-secondary"
+              style={{ width: '100%', background: 'rgba(255,255,255,0.1)', color: '#fff', borderColor: 'transparent' }}
+              onClick={handleStartNew}
+            >
               Start New Encounter
             </button>
           </div>
