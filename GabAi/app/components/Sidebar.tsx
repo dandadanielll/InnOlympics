@@ -111,16 +111,18 @@ export default function Sidebar() {
     >
       <nav
         ref={navRef}
-        className={`relative flex items-center transition-all duration-700 border w-full justify-between ${scrolled
-          ? "bg-[#f2ecdc]/80 backdrop-blur-xl border-[#510400]/20 rounded-full px-10 py-4 shadow-2xl max-w-5xl gap-8"
-          : "backdrop-blur-sm border-[rgba(81,4,0,0.06)] px-10 py-8 w-full max-w-7xl gap-12"
+        className={`relative flex items-center transition-all duration-700 w-full justify-between ${scrolled
+          ? `bg-[#f2ecdc]/80 backdrop-blur-xl ${pathname === '/navigator/before' ? '' : 'border border-[#510400]/20'} rounded-full px-10 py-4 shadow-2xl max-w-5xl gap-8`
+          : `${pathname === '/navigator/before' ? '' : 'backdrop-blur-sm border border-[rgba(81,4,0,0.06)]'} px-10 py-8 w-full max-w-7xl gap-12`
           }`}
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           ...(!scrolled && {
-            background: 'linear-gradient(to bottom, rgba(242,236,220,0.28) 0%, rgba(242,236,220,0) 100%)'
+            background: pathname === '/navigator/before' 
+              ? 'transparent' 
+              : 'linear-gradient(to bottom, rgba(242,236,220,0.28) 0%, rgba(242,236,220,0) 100%)'
           })
         }}
       >
