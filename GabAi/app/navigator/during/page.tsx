@@ -781,9 +781,41 @@ function TaposNaCard() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DuringPage() {
+  const { currentEncounterId, updateEncounter, getCurrentEncounter, getLatestEncounter } = useGabAiStore()
   const [completedStep1, setCompletedStep1] = useState(false)
   const [completedStep2, setCompletedStep2] = useState(false)
   const [completedStep3, setCompletedStep3] = useState(false)
+
+  // ── JOURNEY PERSISTENCE ──
+  useEffect(() => {
+    const encounter = getCurrentEncounter() || getLatestEncounter()
+    if (encounter && encounter.stepState?.during) {
+      const ds = encounter.stepState.during
+      if (ds.step1) setCompletedStep1(true)
+      if (ds.step2) setCompletedStep2(true)
+      if (ds.step3) setCompletedStep3(true)
+    }
+  }, [currentEncounterId])
+
+  // Save steps to store when they change
+  useEffect(() => {
+    const id = currentEncounterId || getLatestEncounter()?.id
+    if (id) {
+      const enc = getCurrentEncounter() || getLatestEncounter()
+      if (enc) {
+        updateEncounter(id, {
+          stepState: {
+            ...enc.stepState,
+            during: {
+              step1: completedStep1,
+              step2: completedStep2,
+              step3: completedStep3,
+            }
+          }
+        })
+      }
+    }
+  }, [completedStep1, completedStep2, completedStep3])
   
   const step1Ref = useRef<HTMLElement>(null)
   const step2Ref = useRef<HTMLElement>(null)
@@ -884,4 +916,3 @@ export default function DuringPage() {
     </div>
   )
 }
-

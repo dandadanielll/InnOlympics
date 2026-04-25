@@ -38,7 +38,7 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div>
               <p className="text-sm text-secondary" style={{ marginBottom: '24px' }}>
-                GabAi will find the right facility for you within Metro Manila's healthcare system.
+                GabAI will find the right facility for you within Metro Manila's healthcare system.
               </p>
               <select className="input" value={city} onChange={(e) => setCity(e.target.value)}>
                 <option value="">— Select City —</option>
@@ -95,7 +95,7 @@ export default function OnboardingPage() {
               disabled={(step === 1 && !city) || (step === 2 && !philHealth)}
               onClick={() => step === 1 ? setStep(2) : handleFinish()}
             >
-              {step === 1 ? 'Continue' : 'Start Using GabAi'}
+              {step === 1 ? 'Continue' : 'Start Using GabAI'}
             </button>
           </div>
 

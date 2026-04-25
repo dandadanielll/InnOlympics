@@ -878,6 +878,7 @@
     opacity: 0;
     transform: translateX(-40px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -889,6 +890,7 @@
     opacity: 0;
     transform: translateX(40px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -899,6 +901,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -909,6 +912,7 @@
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

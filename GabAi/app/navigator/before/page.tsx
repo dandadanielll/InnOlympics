@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { useGabAiStore, type CommutePlan } from '@/lib/store'
 import { FACILITIES, haversineKm, type Facility } from './facilities'
 import { DocumentChecklist } from './DocumentChecklist'
 
 import { CONDITIONS } from './conditions'
 import { SERVICES } from './services'
-import { PGH_ESTIMATES } from './pgh_estimates'
-import { useGabAiStore, type CommutePlan } from '@/lib/store'
-import { useRouter } from 'next/navigation'
+import { REALITY_ESTIMATES } from './pgh_estimates'
 
 const SECONDARY_FILTERS = [
   { key: 'philhealth', label: 'PhilHealth Accredited', field: 'isPhilHealthAccredited' },
@@ -97,7 +97,6 @@ export default function BeforePage() {
 
   // Route map (Step 3)
   const routeMapContainerRef = useRef<HTMLDivElement>(null)
-  const routeMapRef = useRef<any>(null)
 
   // Step 1
   const [needType, setNeedType] = useState<'diagnosis' | 'service' | null>(null)
@@ -168,8 +167,7 @@ export default function BeforePage() {
       if (encounter.needType) setNeedType(encounter.needType)
       if (encounter.symptoms) setQuery(encounter.symptoms)
       if (encounter.classification) setClassification(encounter.classification as any)
-      if (encounter.symptoms && encounter.classification) setCompletedStep1(true)
-
+      
       if (encounter.userLocation) {
         setUserLat(encounter.userLocation.lat)
         setUserLng(encounter.userLocation.lng)
@@ -179,15 +177,47 @@ export default function BeforePage() {
 
       if (encounter.selectedFacility) {
         setSelectedFacility(encounter.selectedFacility)
-        setCompletedStep2(true)
       }
 
       if (encounter.commutePlan) {
         setCommutePlan(encounter.commutePlan)
-        setCompletedStep3(true)
+      }
+
+      // Restore steps
+      if (encounter.stepState?.before) {
+        const bs = encounter.stepState.before
+        if (bs.step1) setCompletedStep1(true)
+        if (bs.step2) setCompletedStep2(true)
+        if (bs.step3) setCompletedStep3(true)
+        if (bs.step4) setCompletedStep4(true)
+      } else {
+        // Legacy/Default fallback logic
+        if (encounter.symptoms && encounter.classification) setCompletedStep1(true)
+        if (encounter.selectedFacility) setCompletedStep2(true)
+        if (encounter.commutePlan) setCompletedStep3(true)
       }
     }
   }, [currentEncounterId])
+
+  // Save steps to store when they change
+  useEffect(() => {
+    if (currentEncounterId) {
+      const enc = getCurrentEncounter()
+      if (enc) {
+        updateEncounter(currentEncounterId, {
+          stepState: {
+            ...enc.stepState,
+            before: {
+              step1: completedStep1,
+              step2: completedStep2,
+              step3: completedStep3,
+              step4: completedStep4,
+            }
+          }
+        })
+      }
+    }
+  }, [completedStep1, completedStep2, completedStep3, completedStep4])
 
   // Sync checklist changes
   const handleChecklistChange = (checked: Record<string, boolean>) => {
@@ -205,46 +235,32 @@ export default function BeforePage() {
   }
 
   // ── Filtering + Sorting Engine ──
-  // Design: Secondary checkbox filters are HARD filters (remove facilities).
-  //         Medical need matching is SOFT (scores for sorting, never removes).
-  //         All facilities always show unless explicitly filtered by user checkboxes.
   const getFilteredFacilities = useCallback(() => {
     if (!locationSet || userLat === null || userLng === null) return []
     let list = [...FACILITIES]
 
-    // 1. Hard filters — only user-selected checkbox filters remove facilities
+    // 1. Hard filters
     Object.entries(secondaryFilters).forEach(([key, active]) => {
       if (!active) return
       const def = SECONDARY_FILTERS.find(f => f.key === key)
       if (def) list = list.filter(f => (f as any)[def.field] === true)
     })
 
-    // 2. Compute relevance score for EVERY facility (never remove based on score)
+    // 2. Compute relevance score
     const scored = list.map(f => {
       let score = 0
-
       if (classification || query) {
         let need = ((classification?.class || '') + ' ' + (classification?.title || '') + ' ' + query).toLowerCase().trim()
         if (need.includes('consultation') || need.includes('checkup') || need.includes('general')) {
           need += ' general medicine consultation'
         }
-
         const queryLower = query.toLowerCase().trim()
         const needTokens = need.split(/[\s,/()·\-]+/).filter(t => t.length >= 3)
-
         f.services.forEach(svc => {
           const svcLower = svc.toLowerCase()
-
-          // Exact full-string match (highest confidence)
           if (queryLower && svcLower === queryLower) { score += 5; return }
-
-          // Direct match: need string contains the full service name
           if (need.includes(svcLower)) { score += 3; return }
-
-          // Reverse match: service name contains the full query
           if (queryLower.length >= 3 && svcLower.includes(queryLower)) { score += 3; return }
-
-          // Token-level match: keywords from the need match parts of the service
           const svcTokens = svcLower.split(/[\s,/()·\-]+/).filter(t => t.length >= 3)
           for (const nt of needTokens) {
             if (svcLower.includes(nt) || svcTokens.some(st => nt.includes(st) || st.includes(nt))) {
@@ -253,51 +269,34 @@ export default function BeforePage() {
             }
           }
         })
-
-        // Tag matching for classification risk level (e.g., "Tertiary", "Level III")
         if (classification?.risk) {
           const riskLower = classification.risk.toLowerCase()
           f.tags.forEach(tag => {
             const tagLower = tag.toLowerCase()
-            if (riskLower.includes(tagLower) || tagLower.includes(riskLower)) {
-              score += 1
-            }
+            if (riskLower.includes(tagLower) || tagLower.includes(riskLower)) { score += 1 }
           })
         }
       }
-
       const dist = haversineKm(userLat, userLng, f.lat, f.lng)
       return { ...f, _score: score, _dist: dist }
     })
 
-    // 3. Sort based on selected mode
+    // 3. Sort
     if (primarySort === 'nearest') {
-      // Progressive distance: start at 1hr travel (10km), expand by 1hr until facilities found
       const sorted = scored.sort((a, b) => a._dist - b._dist)
       for (let hours = 1; hours <= 5; hours++) {
         const threshold = TRAVEL_SPEED_KM_PER_HR * hours
         const nearby = sorted.filter(f => f._dist <= threshold)
         if (nearby.length > 0) return nearby
       }
-      // Fallback: if nothing within 5hrs, show all
       return sorted
     } else if (primarySort === 'free') {
-      // Free/government facilities: BHCs, Konsulta, Malasakit Center, DOH-retained, City-run
       return scored
-        .filter(f =>
-          f.isBHC ||
-          f.isPhilHealthKonsulta ||
-          f.hasMalasakitCenter ||
-          f.tags.some(t => t === 'DOH' || t === 'City-run')
-        )
+        .filter(f => f.isBHC || f.isPhilHealthKonsulta || f.hasMalasakitCenter || f.tags.some(t => t === 'DOH' || t === 'City-run'))
         .sort((a, b) => a._dist - b._dist)
     } else {
-      // "Best for My Need" — sort by relevance score first, then distance as tiebreaker
       let bestList = scored;
-      // Filter based on if they actually provide that service or not
-      if (query || classification) {
-        bestList = bestList.filter(f => f._score > 0);
-      }
+      if (query || classification) { bestList = bestList.filter(f => f._score > 0); }
       return bestList.sort((a, b) => {
         if (b._score !== a._score) return b._score - a._score
         return a._dist - b._dist
@@ -309,14 +308,11 @@ export default function BeforePage() {
 
   // ── Leaflet & Global Init ──
   useEffect(() => {
-    fetch('/api/health').catch(() => { })
     if (typeof window === 'undefined') return
     if (!document.getElementById('leaflet-css')) {
       const link = document.createElement('link'); link.id = 'leaflet-css'; link.rel = 'stylesheet'; link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link)
       const script = document.createElement('script'); script.id = 'leaflet-js'; script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; script.onload = () => initMap(); document.head.appendChild(script)
     } else if (window.L) { initMap() }
-    // Load Google Maps JS API for client-side DirectionsService is not available for this key
-    // The Leaflet+OSM map (free) is used instead for Step 3
   }, [])
 
   // ── Step 3 Leaflet Map (OpenStreetMap, no API key needed) ──
@@ -363,17 +359,14 @@ export default function BeforePage() {
     const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([14.5995, 120.9842], 13)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map)
     L.control.zoom({ position: 'bottomright' }).addTo(map)
-
-    // Click-to-pin location
     map.on('click', (e: any) => {
       if (locationSet) return
       const { lat, lng } = e.latlng
       placeUserMarker(lat, lng)
       setLocationText(`${lat.toFixed(4)}, ${lng.toFixed(4)}`)
     })
-
     mapRef.current = map
-  }, [])
+  }, [locationSet])
 
   const placeUserMarker = useCallback((lat: number, lng: number) => {
     const L = window.L; const map = mapRef.current
@@ -381,38 +374,17 @@ export default function BeforePage() {
     if (userMarkerRef.current) map.removeLayer(userMarkerRef.current)
     if (pulseMarkerRef.current) map.removeLayer(pulseMarkerRef.current)
 
-    const pulseIcon = L.divIcon({
-      className: 'bfr-pulse-wrap',
-      html: `<div class="bfr-pulse-ring"></div>`,
-      iconSize: [40, 40],
-      iconAnchor: [20, 20],
-    })
+    const pulseIcon = L.divIcon({ className: 'bfr-pulse-wrap', html: `<div class="bfr-pulse-ring"></div>`, iconSize: [40, 40], iconAnchor: [20, 20] })
     pulseMarkerRef.current = L.marker([lat, lng], { icon: pulseIcon, interactive: false }).addTo(map)
 
-    userMarkerRef.current = L.circleMarker([lat, lng], {
-      radius: 10,
-      color: '#fff',
-      fillColor: '#4285f4',
-      fillOpacity: 1,
-      weight: 4,
-    })
-      .addTo(map)
-      .bindTooltip('Your Location', { permanent: true, direction: 'top', offset: [0, -14], className: 'bfr-user-tip' })
+    userMarkerRef.current = L.circleMarker([lat, lng], { radius: 10, color: '#fff', fillColor: '#4285f4', fillOpacity: 1, weight: 4 }).addTo(map).bindTooltip('Your Location', { permanent: true, direction: 'top', offset: [0, -14], className: 'bfr-user-tip' })
 
     const nearbyBounds = L.latLngBounds([[lat, lng]])
     let countNearby = 0
     FACILITIES.forEach(f => {
-      if (haversineKm(lat, lng, f.lat, f.lng) < 5 && countNearby < 15) {
-        nearbyBounds.extend([f.lat, f.lng])
-        countNearby++
-      }
+      if (haversineKm(lat, lng, f.lat, f.lng) < 5 && countNearby < 15) { nearbyBounds.extend([f.lat, f.lng]); countNearby++ }
     })
-    if (countNearby > 0) {
-      map.fitBounds(nearbyBounds, { padding: [50, 50], maxZoom: 13 })
-    } else {
-      map.setView([lat, lng], 12)
-    }
-
+    if (countNearby > 0) { map.fitBounds(nearbyBounds, { padding: [50, 50], maxZoom: 13 }) } else { map.setView([lat, lng], 12) }
     setUserLat(lat); setUserLng(lng)
   }, [])
 
@@ -425,9 +397,7 @@ export default function BeforePage() {
     }, () => { alert('Unable to get your location.'); setIsLocating(false) })
   }
 
-  const handleConfirmPinnedLocation = () => {
-    if (userLat !== null && userLng !== null) setLocationSet(true)
-  }
+  const handleConfirmPinnedLocation = () => { if (userLat !== null && userLng !== null) setLocationSet(true) }
 
   const handleSelectLocationSuggestion = (f: Facility) => {
     placeUserMarker(f.lat, f.lng)
@@ -440,19 +410,14 @@ export default function BeforePage() {
     const L = window.L; const map = mapRef.current; if (!L || !map) return
     markersRef.current.forEach(m => map.removeLayer(m)); markersRef.current = []
     if (!locationSet) return
-
     const icon = L.divIcon({ className: 'bfr-marker', html: `<div style="width:22px;height:22px;border-radius:50%;background:var(--primary);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/></svg></div>`, iconSize: [22, 22], iconAnchor: [11, 22], popupAnchor: [0, -24] })
-
     visibleFacilities.forEach(f => {
       const dist = (f as any)._dist?.toFixed(1) || haversineKm(userLat!, userLng!, f.lat, f.lng).toFixed(1)
       const estMin = Math.round(parseFloat(dist) / TRAVEL_SPEED_KM_PER_HR * 60)
       let reason = `${dist} km · ~${estMin} min`
       if (primarySort === 'best') reason += ` · Offers: ${f.services.slice(0, 2).join(', ')}`
       if (primarySort === 'free') reason = f.isBHC ? 'Free BHC · UHC Act' : 'Konsulta · Zero co-pay'
-
-      const marker = L.marker([f.lat, f.lng], { icon })
-        .addTo(map)
-        .bindTooltip(`<div style="font-family:Inter,sans-serif"><div style="font-size:11px;font-weight:700;margin-bottom:1px">${f.name}</div><div style="font-size:10px;color:#666">${reason}</div></div>`, { direction: 'top', offset: [0, -4], className: 'bfr-tooltip' })
+      const marker = L.marker([f.lat, f.lng], { icon }).addTo(map).bindTooltip(`<div style="font-family:Inter,sans-serif"><div style="font-size:11px;font-weight:700;margin-bottom:1px">${f.name}</div><div style="font-size:10px;color:#666">${reason}</div></div>`, { direction: 'top', offset: [0, -4] })
       marker.on('click', () => { setSelectedFacility(f); setShowGastosPrompt(true) })
       markersRef.current.push(marker)
     })
@@ -460,8 +425,6 @@ export default function BeforePage() {
 
   useEffect(() => { syncMarkers() }, [syncMarkers])
   useEffect(() => { if (completedStep1 && mapRef.current) setTimeout(() => mapRef.current.invalidateSize(), 400) }, [completedStep1])
-
-
 
   const handleStep1Submit = async () => {
     setIsClassifying(true)
@@ -515,18 +478,39 @@ export default function BeforePage() {
 
   return (
     <div className="bfr">
-
-      {/* ═══════ STEP 1 ═══════ */}
+      {/* STEP 1 */}
       <section className="bfr-sec">
         <div className="bfr-num-col"><div className={`bfr-circ ${completedStep1 ? 'done' : 'active'}`}>{completedStep1 ? <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg> : '1'}</div><div className={`bfr-line ${completedStep1 ? 'filled' : ''}`} /></div>
-        <div className="bfr-main bfr-s1-center">
+        <div className="bfr-main">
           <div className="bfr-s1-card">
-            <span className="bfr-tag">Patient Intake</span>
+
             <h1 className="bfr-h1">What do you need?</h1>
             <p className="bfr-p">Select the option that best describes your situation.</p>
             <div className="bfr-choices">
-              <button className={`bfr-choice ${needType === 'diagnosis' ? 'on' : ''}`} onClick={() => setNeedType('diagnosis')}><div className="bfr-choice-i"><svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg></div><div className="bfr-choice-t"><strong>I have a diagnosis</strong><span>Follow-up on an existing condition or referral.</span></div>{needType === 'diagnosis' && <svg className="bfr-chk" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>}</button>
-              <button className={`bfr-choice ${needType === 'service' ? 'on' : ''}`} onClick={() => setNeedType('service')}><div className="bfr-choice-i"><svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 8v8M8 12h8" /></svg></div><div className="bfr-choice-t"><strong>I need a specific service</strong><span>Looking for an X-ray, lab, vaccination, etc.</span></div>{needType === 'service' && <svg className="bfr-chk" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>}</button>
+              <button className={`bfr-choice ${needType === 'diagnosis' ? 'on' : ''}`} onClick={() => {
+                const next = needType === 'diagnosis' ? null : 'diagnosis'
+                setNeedType(next)
+                if (!next || next !== needType) {
+                  setQuery('')
+                  setClassification(null)
+                  setCompletedStep1(false)
+                  if (currentEncounterId) updateEncounter(currentEncounterId, { needType: next, symptoms: '', classification: null })
+                } else if (currentEncounterId) {
+                  updateEncounter(currentEncounterId, { needType: next })
+                }
+              }}><div className="bfr-choice-i"><svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg></div><div className="bfr-choice-t"><strong>I have a diagnosis</strong><span>Follow-up on an existing condition or referral.</span></div>{needType === 'diagnosis' && <svg className="bfr-chk" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>}</button>
+              <button className={`bfr-choice ${needType === 'service' ? 'on' : ''}`} onClick={() => {
+                const next = needType === 'service' ? null : 'service'
+                setNeedType(next)
+                if (!next || next !== needType) {
+                  setQuery('')
+                  setClassification(null)
+                  setCompletedStep1(false)
+                  if (currentEncounterId) updateEncounter(currentEncounterId, { needType: next, symptoms: '', classification: null })
+                } else if (currentEncounterId) {
+                  updateEncounter(currentEncounterId, { needType: next })
+                }
+              }}><div className="bfr-choice-i"><svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 8v8M8 12h8" /></svg></div><div className="bfr-choice-t"><strong>I need a specific service</strong><span>Looking for an X-ray, lab, vaccination, etc.</span></div>{needType === 'service' && <svg className="bfr-chk" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>}</button>
             </div>
             {needType && (
               <div className="bfr-inp-wrap fade-in">
@@ -535,13 +519,13 @@ export default function BeforePage() {
                   <div className="bfr-sb">
                     <svg className="bfr-sb-icon" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                     <input className="bfr-sb-input" type="text" placeholder={needType === 'diagnosis' ? 'e.g., Hypertension, Suspected TB...' : 'e.g., Chest X-Ray, Blood extraction...'} value={query} onChange={e => { setQuery(e.target.value); setShowSuggestions(true) }} onFocus={() => { if (query.trim()) setShowSuggestions(true) }} onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} />
-                    <button className="bfr-sb-btn" disabled={!query.trim() || isClassifying || !!classification} onClick={handleStep1Submit}>
+                    <button className="bfr-sb-btn" disabled={!query.trim() || isClassifying} onClick={handleStep1Submit}>
                       {isClassifying ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" style={{ animation: 'bspin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg> : <>Confirm & Route<svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg></>}
                     </button>
                   </div>
                   {showSuggestions && filteredSuggestions.length > 0 && (<div className="bfr-ac">{filteredSuggestions.slice(0, 6).map(s => (<button key={s} className="bfr-ac-item" onMouseDown={() => { setQuery(s); setShowSuggestions(false) }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>{s}</button>))}</div>)}
                 </div>
-                {classification && (<div className="bfr-cls fade-in"><svg width="18" height="18" fill="none" stroke="var(--success)" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg><div><strong>{classification.title}</strong><span>{classification.class} · {classification.risk}</span></div></div>)}
+                {/* Classification result removed to avoid appearing as a formal diagnosis */}
               </div>
             )}
           </div>
@@ -552,22 +536,9 @@ export default function BeforePage() {
       <section className={`bfr-sec ${completedStep1 ? '' : 'locked'}`} ref={step2Ref}>
         <div className="bfr-num-col"><div className={`bfr-circ ${completedStep2 ? 'done' : completedStep1 ? 'active' : ''}`}>{completedStep2 ? <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg> : '2'}</div><div className={`bfr-line ${completedStep2 ? 'filled' : ''}`} /></div>
         <div className="bfr-main">
-          {/* ── DEPARTMENT BANNER (half-width) ── */}
-          {classification && (
-            <div className="bfr-dept-banner">
-              <div className="bfr-dept-icon"><svg width="20" height="20" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg></div>
-              <div className="bfr-dept-text">
-                <span className="bfr-dept-label">Recommended Department</span>
-                <strong className="bfr-dept-name">{classification.class}</strong>
-              </div>
-              <span className="bfr-dept-badge">{classification.risk}</span>
-            </div>
-          )}
+          {/* Department banner removed to avoid appearing as a formal diagnosis */}
 
-          <span className="bfr-tag">Facility Routing</span>
           <h1 className="bfr-h1">Locate a Facility</h1>
-
-          {/* ── LOCATION BAR ── */}
           <div className="bfr-locbar">
             <div className="bfr-locbar-inner">
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
@@ -585,7 +556,45 @@ export default function BeforePage() {
                   )}
                 </>
               ) : (
-                <button className="bfr-locbar-change" onClick={() => { setLocationSet(false); setLocationText('') }}>Change</button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button className="bfr-locbar-change" onClick={() => { setLocationSet(false); setLocationText('') }}>Change</button>
+                  <div className="bfr-mf-wrap">
+                    <button className={`bfr-mf-btn ${showFilters ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setShowFilters(!showFilters) }}>
+                      <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg>
+                      Filters {activeSecondaryCount > 0 && <span className="bfr-badge">{activeSecondaryCount}</span>}
+                    </button>
+                    {showFilters && (
+                      <div className="bfr-mf-dd fade-in" onClick={e => e.stopPropagation()}>
+                        <div className="bfr-mf-sec">
+                          <label className="bfr-mf-l">Sort by</label>
+                          <button className={`bfr-mf-opt ${primarySort === 'best' ? 'on' : ''}`} onClick={() => setPrimarySort('best')}>
+                            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+                            Best for My Need
+                          </button>
+                          <button className={`bfr-mf-opt ${primarySort === 'nearest' ? 'on' : ''}`} onClick={() => setPrimarySort('nearest')}>
+                            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                            Near Me (≤1hr)
+                          </button>
+                          <button className={`bfr-mf-opt ${primarySort === 'free' ? 'on' : ''}`} onClick={() => setPrimarySort('free')}>
+                            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6" /></svg>
+                            Free Services
+                          </button>
+                        </div>
+                        <div className="bfr-mf-div" />
+                        <div className="bfr-mf-sec">
+                          <label className="bfr-mf-l">Preferences</label>
+                          {SECONDARY_FILTERS.map(sf => (
+                            <label key={sf.key} className="bfr-mf-item"><input type="checkbox" checked={!!secondaryFilters[sf.key]} onChange={() => toggleSecondary(sf.key)} /><span>{sf.label}</span></label>
+                          ))}
+                        </div>
+                        <div className="bfr-mf-ft">
+                          <span className="bfr-mf-count">{visibleFacilities.length} of {FACILITIES.length} facilities</span>
+                          {activeSecondaryCount > 0 && <button className="bfr-mf-clear" onClick={clearFilters}>Clear all</button>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
             {showLocSuggestions && locationSuggestions.length > 0 && (
@@ -601,45 +610,8 @@ export default function BeforePage() {
                 ))}
               </div>
             )}
-            {!locationSet && !showLocSuggestions && <p className="bfr-locbar-hint">Set your location first — use GPS, type it, or click the map to drop a pin.</p>}
           </div>
 
-          {/* ── FILTER PILLS ── */}
-          {locationSet && (
-            <div className="bfr-filter-bar fade-in">
-              <div className="bfr-pills">
-                <button className={`bfr-pill ${primarySort === 'best' ? 'on' : ''}`} onClick={() => setPrimarySort('best')}>
-                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
-                  Best for My Need
-                </button>
-                <button className={`bfr-pill ${primarySort === 'nearest' ? 'on' : ''}`} onClick={() => setPrimarySort('nearest')}>
-                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
-                  Near Me (≤1hr)
-                </button>
-                <button className={`bfr-pill ${primarySort === 'free' ? 'on' : ''}`} onClick={() => setPrimarySort('free')}>
-                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6" /></svg>
-                  Free Services
-                </button>
-              </div>
-              <div className="bfr-mf-wrap">
-                <button className="bfr-mf-btn" onClick={() => setShowFilters(!showFilters)}>
-                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg>
-                  Filters {activeSecondaryCount > 0 && <span className="bfr-badge">{activeSecondaryCount}</span>}
-                </button>
-                {showFilters && (
-                  <div className="bfr-mf-dd fade-in">
-                    {SECONDARY_FILTERS.map(sf => (
-                      <label key={sf.key} className="bfr-mf-item"><input type="checkbox" checked={!!secondaryFilters[sf.key]} onChange={() => toggleSecondary(sf.key)} /><span>{sf.label}</span></label>
-                    ))}
-                    {activeSecondaryCount > 0 && <button className="bfr-mf-clear" onClick={clearFilters}>Clear all</button>}
-                  </div>
-                )}
-              </div>
-              <span className="bfr-count">{visibleFacilities.length} of {FACILITIES.length} facilities</span>
-            </div>
-          )}
-
-          {/* ── MAP + LIST GRID ── */}
           <div className="bfr-s2-grid">
             <div className="bfr-map-area">
               <div ref={mapContainerRef} className="bfr-map" />
@@ -666,7 +638,7 @@ export default function BeforePage() {
                   return (
                     <button key={f.id} className={`bfr-fc ${selectedFacility?.id === f.id ? 'on' : ''}`} onClick={() => { setSelectedFacility(f); setShowGastosPrompt(true); mapRef.current?.setView([f.lat, f.lng], 15) }}>
                       <div className="bfr-fc-top"><span>{f.district}</span><span className={f.isBHC || f.isPhilHealthKonsulta || f.hasMalasakitCenter || f.tags.some(t => t === 'DOH' || t === 'City-run') ? 'free' : ''}>{f.isBHC ? '• FREE (BHC)' : f.hasMalasakitCenter ? '• GOV\'T FREE' : f.tags.some(t => t === 'DOH' || t === 'City-run') ? '• GOV\'T' : f.isPhilHealthAccredited ? '• PHILHEALTH' : '• PRIVATE'}</span></div>
-                      <div className="bfr-fc-mid"><h4 style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>{f.name} {!f.unverified && <span style={{ fontSize: '11px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#ecfdf5', padding: '2px 6px', borderRadius: '12px', fontWeight: 600 }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg> Verified</span>}</h4><p>{f.address}</p><div className="bfr-fc-meta"><span className="bfr-fc-dist">{dist} km</span><span className="bfr-fc-time">~{estMin} min</span></div><div className="bfr-fc-tags">{f.tags.slice(0, 3).map(t => <span key={t}>{t}</span>)}</div></div>
+                      <div className="bfr-fc-mid"><h4>{f.name}</h4><p>{f.address}</p><div className="bfr-fc-meta"><span className="bfr-fc-dist">{dist} km</span><span className="bfr-fc-time">~{estMin} min</span></div><div className="bfr-fc-tags">{f.tags.slice(0, 3).map(t => <span key={t}>{t}</span>)}</div></div>
                     </button>
                   )
                 })}
@@ -680,19 +652,16 @@ export default function BeforePage() {
 
       {/* ═══════ STEP 3 ═══════ */}
       <section className={`bfr-sec ${completedStep2 ? '' : 'locked'}`} ref={step3Ref}>
-        <div className="bfr-num-col"><div className={`bfr-circ ${commutePlan ? 'done' : completedStep2 ? 'active' : ''}`}>3</div></div>
+        <div className="bfr-num-col"><div className={`bfr-circ ${completedStep3 ? 'done' : completedStep2 ? 'active' : ''}`}>{completedStep3 ? <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg> : '3'}</div><div className={`bfr-line ${completedStep3 ? 'filled' : ''}`} /></div>
         <div className="bfr-main">
-          <span className="bfr-tag">Commute & Expenses</span>
+
           <h1 className="bfr-h1">Travel & Gastos</h1>
           <p className="bfr-p">Route via OpenStreetMap · Fare based on official LTFRB 2024 matrices.</p>
           {isPlanning && (<div className="bfr-loading"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" style={{ animation: 'bspin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg><strong>Analyzing Manila Transit</strong><span>Computing fare matrices…</span></div>)}
           {!isPlanning && commutePlan && selectedFacility && (
             <div className="bfr-s3-grid fade-in">
-              {/* Left: Receipt with vertical stepper legs */}
               <div className="bfr-receipt">
-                <div className="bfr-rh"><span className="bfr-rl">DESTINATION</span><h2>{selectedFacility.name}</h2><p>{selectedFacility.address}</p></div>
-
-                {/* Vertical stepper legs */}
+                <div className="bfr-rh"><h2>{selectedFacility?.name}</h2></div>
                 <div className="bfr-stepper">
                   {/* Origin node */}
                   <div className="bfr-step-node">
@@ -731,7 +700,6 @@ export default function BeforePage() {
                 <div style={{ padding: '16px 22px' }}><button className="bfr-pri-btn" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '14px' }} onClick={() => { setCompletedStep3(true); setTimeout(() => step4Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>Proceed to Document Checklist <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg></button></div>
               </div>
 
-              {/* Right: Leaflet + OpenStreetMap route (free, no API key) */}
               <div className="bfr-route-map-area">
                 <div ref={s3MapContainerRef} style={{ width: '100%', height: '100%', borderRadius: '12px', minHeight: '400px' }} />
                 <div style={{ padding: '8px 12px', fontSize: '11px', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -746,9 +714,9 @@ export default function BeforePage() {
 
       {/* ═══════ STEP 4 ═══════ */}
       <section className={`bfr-sec ${completedStep3 ? '' : 'locked'}`} ref={step4Ref} style={{ height: 'auto', minHeight: '100vh', overflowY: 'auto', paddingBottom: '60px' }}>
-        <div className="bfr-num-col"><div className="bfr-circ active">4</div></div>
+        <div className="bfr-num-col"><div className={`bfr-circ ${completedStep4 ? 'done' : 'active'}`}>{completedStep4 ? <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg> : '4'}</div><div className={`bfr-line ${completedStep4 ? 'filled' : ''}`} /></div>
         <div className="bfr-main" style={{ overflow: 'visible' }}>
-          <span className="bfr-tag">Preparation</span>
+
           <h1 className="bfr-h1">Requirements Checklist</h1>
           <p className="bfr-p">Prepare these documents and requirements to ensure a smooth, free, or discounted service transaction.</p>
 
@@ -773,24 +741,35 @@ export default function BeforePage() {
       <section className={`bfr-sec ${completedStep4 ? '' : 'locked'}`} ref={step5Ref} style={{ height: 'auto', minHeight: '100vh', paddingBottom: '80px' }}>
         <div className="bfr-num-col"><div className="bfr-circ active">5</div></div>
         <div className="bfr-main">
-          <span className="bfr-tag">Reality Check</span>
+
           <h1 className="bfr-h1">Time & Experience Estimations</h1>
 
-          {selectedFacility && !(selectedFacility.id === 'h4' || selectedFacility.name.includes('Philippine General')) ? (
+          {(() => {
+            const facilityEstimates = REALITY_ESTIMATES.filter(e => 
+              e.facilityId === selectedFacility?.id || 
+              (selectedFacility?.isBHC && e.facilityId === 'bhc') ||
+              (e.facilityId === 'all')
+            ).filter(e => e.needTypes.includes('all') || e.needTypes.includes(needType || ''))
+
+            if (!selectedFacility || facilityEstimates.length === 0) {
+              return (
             <div style={{ background: '#fff', border: '1.5px dashed var(--border)', borderRadius: '16px', padding: '40px', textAlign: 'center', marginTop: '20px' }}>
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--bg-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
                 <svg width="28" height="28" fill="none" stroke="var(--primary)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
               </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px' }}>Upcoming Feature for {selectedFacility.name}</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', maxWidth: '400px', margin: '0 auto 24px', lineHeight: 1.6 }}>Wait time estimations and crowdsourced reality checks are currently under development and are only available for PGH at the moment.</p>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px' }}>Upcoming Feature for {selectedFacility?.name || 'this facility'}</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', maxWidth: '400px', margin: '0 auto 24px', lineHeight: 1.6 }}>Wait time estimations and crowdsourced reality checks are currently under development for this specific location.</p>
               <button className="bfr-pri-btn" onClick={handleStartJourney}>Start My Journey <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg></button>
-            </div>
-          ) : (
-            <div>
-              <p className="bfr-p">Based on your condition selection in Step 1 (<strong>{needType === 'emergency' ? 'Emergency' : needType === 'diagnosis' ? 'Diagnostics' : needType === 'medicine' ? 'Medicine' : 'Consultation'}</strong>), here are the realistic processing times and services you will likely queue for. Data is crowdsourced from Reddit and local patient communities.</p>
+                </div>
+              )
+            }
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px', marginTop: '20px' }}>
-                {PGH_ESTIMATES.filter(e => e.needTypes.includes('all') || e.needTypes.includes(needType)).map((e, i) => (
+            return (
+            <div>
+              <p className="bfr-p" style={{ maxWidth: 'none' }}>Based on your selection for <strong>{selectedFacility.name}</strong>, here are the realistic processing times and services you will likely queue for.<br />Data is crowdsourced from Reddit and local patient communities.</p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '24px', marginTop: '32px' }}>
+                {facilityEstimates.map((e, i) => (
                   <div key={i} style={{ background: '#fff', borderRadius: '16px', border: '1.5px solid var(--border-light)', overflow: 'hidden' }}>
                     <div style={{ background: 'var(--primary-light)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>{e.service}</h4>
@@ -824,7 +803,8 @@ export default function BeforePage() {
                 <button className="bfr-pri-btn" style={{ padding: '14px 32px', fontSize: '15px' }} onClick={handleStartJourney}>I'm Ready — Transition to Hospital View <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg></button>
               </div>
             </div>
-          )}
+            )
+          })()}
         </div>
       </section>
 
@@ -832,33 +812,32 @@ export default function BeforePage() {
       <style dangerouslySetInnerHTML={{
         __html: `
         .bfr{margin:-48px}
-        .bfr-sec{height:100vh;display:flex;padding:40px 48px;gap:24px;box-sizing:border-box;transition:opacity .4s,filter .4s;overflow:hidden}
+        .bfr-sec{height:100vh;display:flex;padding:40px 10%;gap:48px;box-sizing:border-box;transition:opacity .4s,filter .4s;overflow:hidden;justify-content:center;scroll-margin-top:80px}
         .bfr-sec.locked{opacity:.15;pointer-events:none;filter:blur(3px)}
-        .bfr-num-col{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:44px;padding-top:2px}
+        .bfr-num-col{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:44px;padding-top:8px}
         .bfr-circ{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;border:2px solid var(--border);color:var(--text-muted);background:#fff;transition:all .35s;flex-shrink:0}
         .bfr-circ.active{background:var(--text-primary);border-color:var(--text-primary);color:#fff}
         .bfr-circ.done{background:var(--primary);border-color:var(--primary);color:#fff}
         .bfr-line{flex:1;width:2px;background:var(--border-light);margin-top:10px;transition:background .4s}
         .bfr-line.filled{background:var(--primary)}
         .bfr-main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
-        .bfr-tag{display:inline-flex;align-items:center;gap:6px;font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--primary);background:var(--primary-light);padding:5px 14px;border-radius:20px;width:fit-content;margin-bottom:14px}
-        .bfr-h1{font-family:'Inter',-apple-system,sans-serif;font-size:2.5rem;font-weight:800;color:var(--text-primary);margin:0 0 10px;line-height:1.1;letter-spacing:-.03em}
+
+        .bfr-h1{font-family:'Outfit',sans-serif;font-size:3.5rem;font-weight:800;color:var(--text-primary);margin:0 0 12px;line-height:1.05;letter-spacing:-.04em}
         .bfr-p{font-size:.9375rem;color:var(--text-secondary);line-height:1.6;margin:0 0 28px;max-width:560px}
 
-        /* ── Step 1 centered container — LARGER ── */
         .bfr-s1-center{justify-content:center;align-items:center}
-        .bfr-s1-card{width:100%;max-width:720px;text-align:left}
+        .bfr-s1-card{width:100%;max-width:1040px;text-align:left}
 
-        .bfr-choices{display:flex;flex-direction:column;gap:16px;margin-bottom:28px}
-        .bfr-choice{display:flex;align-items:center;gap:22px;width:100%;text-align:left;padding:26px 30px;background:#fff;border:1.5px solid var(--border-light);border-radius:18px;cursor:pointer;transition:all .2s;font-family:inherit}
-        .bfr-choice:hover{border-color:rgba(126,38,37,.25)}
-        .bfr-choice.on{border-color:var(--primary);background:rgba(126,38,37,.02)}
-        .bfr-choice-i{width:62px;height:62px;border-radius:16px;background:var(--bg-muted);color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .bfr-choice.on .bfr-choice-i{background:var(--primary-light)}
-        .bfr-choice-t{flex:1}
-        .bfr-choice-t strong{display:block;font-size:1.125rem;font-weight:700;color:var(--text-primary);margin-bottom:4px}
-        .bfr-choice-t span{font-size:.9rem;color:var(--text-secondary)}
-        .bfr-chk{color:var(--primary);flex-shrink:0}
+        .bfr-choices{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px}
+        .bfr-choice{display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px;width:100%;padding:32px 24px;background:#fff;border:1.5px solid var(--border-light);border-radius:24px;cursor:pointer;transition:all .3s cubic-bezier(0.4, 0, 0.2, 1);font-family:inherit;position:relative}
+        .bfr-choice:hover{border-color:rgba(126,38,37,.25);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.04)}
+        .bfr-choice.on{border-color:var(--primary);background:#fff;border-width:2px;box-shadow:0 12px 30px rgba(81,4,0,0.08)}
+        .bfr-choice-i{width:72px;height:72px;border-radius:20px;background:var(--bg-muted);color:var(--text-muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .3s}
+        .bfr-choice.on .bfr-choice-i{background:var(--primary-light);color:var(--primary);transform:scale(1.05)}
+        .bfr-choice-t{display:flex;flex-direction:column;gap:6px}
+        .bfr-choice-t strong{display:block;font-size:1.25rem;font-weight:800;color:var(--text-primary);margin:0}
+        .bfr-choice-t span{font-size:.875rem;color:var(--text-secondary);line-height:1.5}
+        .bfr-chk{color:var(--primary);position:absolute;top:18px;right:18px;background:#fff;border-radius:50%;padding:2px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
 
         .bfr-inp-wrap{background:var(--bg-muted);border-radius:18px;padding:26px 30px}
         .bfr-lbl{display:block;font-weight:700;font-size:.8125rem;color:var(--text-primary);margin-bottom:14px}
@@ -875,7 +854,6 @@ export default function BeforePage() {
         .bfr-cls{display:flex;align-items:center;gap:12px;margin-top:14px;padding:14px 20px;background:#fff;border-radius:12px;border:1px solid var(--success-border)}
         .bfr-cls div{display:flex;flex-direction:column;gap:2px}.bfr-cls strong{font-size:.875rem;color:var(--text-primary)}.bfr-cls span{font-size:.75rem;color:var(--text-secondary)}
 
-        /* ── DEPARTMENT BANNER (half-width) ── */
         .bfr-dept-banner{display:flex;align-items:center;gap:14px;padding:14px 20px;background:var(--primary);border-radius:14px;margin-bottom:16px;color:#fff;max-width:50%}
         .bfr-dept-icon{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
         .bfr-dept-text{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0}
@@ -883,9 +861,8 @@ export default function BeforePage() {
         .bfr-dept-name{font-size:1.125rem;font-weight:800;letter-spacing:-.01em}
         .bfr-dept-badge{font-size:.625rem;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(255,255,255,.2);white-space:nowrap}
 
-        /* ── LOCATION BAR ── */
         .bfr-locbar{margin-bottom:12px;position:relative}
-        .bfr-locbar-inner{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--border-light);border-radius:14px;padding:8px 10px 8px 16px;max-width:calc(100% - 274px)}
+        .bfr-locbar-inner{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--border-light);border-radius:14px;padding:8px 10px 8px 16px;max-width:100%}
         .bfr-locbar-input{flex:1;border:none;outline:none;background:transparent;font-size:.8125rem;color:var(--text-primary);font-family:'Inter',sans-serif}
         .bfr-locbar-input::placeholder{color:var(--text-muted)}
         .bfr-locbar-gps,.bfr-locbar-confirm{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:10px;border:none;font-size:.6875rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;white-space:nowrap}
@@ -893,9 +870,7 @@ export default function BeforePage() {
         .bfr-locbar-gps:disabled{opacity:.5;cursor:not-allowed}
         .bfr-locbar-confirm{background:var(--primary);color:#fff}.bfr-locbar-confirm:hover{background:var(--primary-hover)}
         .bfr-locbar-change{padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:transparent;font-size:.6875rem;font-weight:600;cursor:pointer;color:var(--text-secondary);font-family:'Inter',sans-serif}
-        .bfr-locbar-hint{font-size:.6875rem;color:var(--text-muted);margin:6px 0 0 4px;font-style:italic}
 
-        /* ── Location autocomplete ── */
         .bfr-loc-ac{position:absolute;top:100%;left:0;max-width:calc(100% - 274px);width:100%;background:#fff;border-radius:12px;box-shadow:0 8px 28px rgba(61,27,17,.12);border:1px solid var(--border-light);z-index:60;overflow:hidden;margin-top:4px}
         .bfr-loc-ac-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 16px;border:none;background:transparent;cursor:pointer;transition:all .15s;border-bottom:1px solid rgba(61,27,17,.04);font-family:'Inter',sans-serif}
         .bfr-loc-ac-item:last-child{border-bottom:none}
@@ -905,23 +880,26 @@ export default function BeforePage() {
         .bfr-loc-ac-text strong{font-size:.75rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .bfr-loc-ac-text span{font-size:.625rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-        /* ── FILTER PILLS ── */
-        .bfr-filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;position:relative;z-index:10;background:var(--bg);padding:8px 14px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.05);border:1px solid var(--border-light);flex-shrink:0}
-        .bfr-pills{display:flex;gap:6px}
-        .bfr-pill{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:32px;border:1.5px solid var(--border);background:#fff;font-size:.75rem;font-weight:600;color:var(--text-secondary);cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
-        .bfr-pill:hover{background:var(--bg-muted)}.bfr-pill.on{background:var(--primary);border-color:var(--primary);color:#fff}
-        .bfr-mf-wrap{position:relative;margin-left:4px}
-        .bfr-mf-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:32px;border:1.5px solid var(--border);background:#fff;font-size:.75rem;font-weight:600;color:var(--text-secondary);cursor:pointer;font-family:'Inter',sans-serif}
-        .bfr-mf-btn:hover{background:var(--bg-muted)}
-        .bfr-badge{background:var(--primary);color:#fff;font-size:.5625rem;padding:1px 6px;border-radius:10px;font-weight:700}
-        .bfr-mf-dd{position:absolute;top:calc(100% + 6px);right:0;width:220px;background:#fff;border-radius:14px;box-shadow:0 8px 28px rgba(61,27,17,.12);border:1px solid var(--border-light);padding:6px 0;z-index:50}
-        .bfr-mf-item{display:flex;align-items:center;gap:8px;padding:8px 14px;font-size:.6875rem;color:var(--text-secondary);cursor:pointer;transition:background .15s}
-        .bfr-mf-item:hover{background:var(--bg-muted)}.bfr-mf-item input[type="checkbox"]{accent-color:var(--primary);width:14px;height:14px}.bfr-mf-item span{flex:1}
-        .bfr-mf-clear{width:100%;padding:8px 14px;text-align:center;font-size:.625rem;font-weight:700;color:var(--primary);background:transparent;border:none;border-top:1px solid var(--border-light);cursor:pointer;font-family:'Inter',sans-serif}
-        .bfr-count{font-size:.6875rem;color:var(--text-muted);font-weight:600;margin-left:auto}
+        .bfr-mf-wrap{position:relative}
+        .bfr-mf-btn{display:flex;align-items:center;gap:8px;padding:8px 16px;background:#fff;border:1.5px solid var(--border-light);border-radius:30px;font-size:.75rem;font-weight:700;color:var(--text-secondary);cursor:pointer;transition:all .3s;font-family:'Inter',sans-serif}
+        .bfr-mf-btn:hover{border-color:rgba(126,38,37,.3);color:var(--primary)}
+        .bfr-mf-btn.active{background:var(--primary);border-color:var(--primary);color:#fff}
+        .bfr-mf-dd{position:absolute;top:calc(100% + 12px);right:0;width:280px;background:#fff;border-radius:24px;box-shadow:0 20px 50px rgba(0,0,0,.18);border:1px solid var(--border-light);padding:24px;z-index:200;display:flex;flex-direction:column;gap:20px}
+        .bfr-mf-sec{display:flex;flex-direction:column;gap:10px}
+        .bfr-mf-l{display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.12em;font-weight:800;color:var(--text-muted);margin-bottom:4px}
+        .bfr-mf-opt{display:flex;align-items:center;gap:12px;width:100%;padding:10px 14px;border-radius:12px;border:1.5px solid transparent;background:var(--bg-muted);font-size:.8125rem;font-weight:600;color:var(--text-secondary);cursor:pointer;transition:all .2s;text-align:left;font-family:'Inter',sans-serif}
+        .bfr-mf-opt:hover{background:rgba(126,38,37,.04);color:var(--primary)}
+        .bfr-mf-opt.on{background:rgba(126,38,37,.06);border-color:var(--primary);color:var(--primary)}
+        .bfr-mf-div{height:1px;background:var(--border-light);margin:0 -24px}
+        .bfr-mf-item{display:flex;align-items:center;gap:12px;font-size:.8125rem;color:var(--text-secondary);cursor:pointer;padding:4px 0;transition:color .2s;font-family:'Inter',sans-serif}
+        .bfr-mf-item:hover{color:var(--text-primary)}
+        .bfr-mf-item input{width:16px;height:16px;accent-color:var(--primary);cursor:pointer}
+        .bfr-mf-ft{display:flex;align-items:center;justify-content:space-between;padding-top:8px}
+        .bfr-mf-count{font-size:.7rem;color:var(--text-muted);font-weight:600}
+        .bfr-mf-clear{background:none;border:none;color:var(--primary);font-size:.7rem;font-weight:700;cursor:pointer;padding:4px 8px;border-radius:6px;transition:background .2s;font-family:'Inter',sans-serif}
+        .bfr-mf-clear:hover{background:var(--primary-light)}
 
-        /* ── GRID: map-first, list-sidebar ── */
-        .bfr-s2-grid{display:grid;grid-template-columns:1fr 260px;gap:14px;flex:1;min-height:0;overflow:hidden}
+        .bfr-s2-grid{display:grid;grid-template-columns:1fr 260px;gap:14px;height:470px;min-height:0;overflow:hidden}
         .bfr-map-area{position:relative;border-radius:14px;overflow:hidden;min-height:0}
         .bfr-map{width:100%;height:100%;z-index:1}
         .bfr-flist{display:flex;flex-direction:column;gap:6px;overflow-y:auto;padding-right:4px}
@@ -951,20 +929,17 @@ export default function BeforePage() {
         .bfr-ghost-btn{background:transparent;border:1.5px solid var(--border);border-radius:40px;padding:9px 14px;font-weight:600;font-size:.6875rem;cursor:pointer;color:var(--text-secondary);font-family:'Inter',sans-serif;transition:all .2s}
         .bfr-ghost-btn:hover{background:var(--bg-muted)}
 
-        /* ═══════ STEP 3 — REDESIGNED ═══════ */
         .bfr-loading{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center}
         .bfr-loading strong{font-size:1rem;font-weight:800;color:var(--text-primary)}.bfr-loading span{font-size:.75rem;color:var(--text-secondary)}
 
-        /* Grid: receipt left + map right */
-        .bfr-s3-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;flex:1;min-height:0;overflow:hidden}
+        .bfr-s3-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;height:490px;min-height:0;overflow:hidden}
 
-        .bfr-receipt{background:#fff;border-radius:16px;border:1.5px solid var(--border-light);box-shadow:0 4px 20px rgba(61,27,17,.04);overflow-y:auto;display:flex;flex-direction:column}
+        .bfr-receipt{background:#fff;border-radius:16px;border:1.5px solid var(--border-light);box-shadow:0 4px 20px rgba(61,27,17,.04);display:flex;flex-direction:column;overflow:hidden}
         .bfr-rh{padding:18px 22px;border-bottom:1px dashed var(--border-light);flex-shrink:0}
         .bfr-rl{font-size:.5rem;text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--text-muted);display:block;margin-bottom:3px}
         .bfr-rh h2{font-size:1.25rem;font-weight:800;color:var(--primary);margin:0 0 2px}.bfr-rh p{font-size:.6875rem;color:var(--text-secondary);margin:0}
 
-        /* ── Vertical stepper ── */
-        .bfr-stepper{padding:16px 22px;flex:1;display:flex;flex-direction:column}
+        .bfr-stepper{padding:16px 22px;flex:1;display:flex;flex-direction:column;overflow-y:auto}
         .bfr-step-node{position:relative;display:flex;align-items:flex-start;gap:14px;padding-bottom:0}
         .bfr-step-connector{position:absolute;left:16px;top:-2px;width:3px;height:calc(100% + 2px);border-radius:2px;z-index:0}
         .bfr-step-connector.dest{background:var(--primary)!important}
@@ -984,21 +959,14 @@ export default function BeforePage() {
         .bfr-rtotals>div{display:flex;flex-direction:column;gap:3px}.bfr-rtotals strong{font-size:.9375rem;font-weight:800}
         .bfr-rbig{font-size:1.375rem!important;color:var(--primary)}
 
-        /* ── Route Map (right side) ── */
         .bfr-route-map-area{border-radius:16px;overflow:hidden;position:relative;min-height:0;display:flex;flex-direction:column}
         .bfr-route-map{flex:1;min-height:300px;z-index:1}
-        .bfr-route-legend{display:flex;gap:10px;padding:8px 14px;background:#fff;border-top:1px solid var(--border-light);flex-shrink:0;flex-wrap:wrap}
-        .bfr-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:.625rem;font-weight:700;color:var(--text-secondary);font-family:'Inter',sans-serif}
-        .bfr-legend-line{width:22px;height:4px;border-radius:2px;display:inline-block}
-        .bfr-route-marker{background:transparent!important;border:none!important}
 
-        /* ── Leaflet overrides ── */
         .bfr-marker{background:transparent!important;border:none!important}
         .leaflet-tooltip{border-radius:8px!important;padding:7px 10px!important;box-shadow:0 4px 12px rgba(0,0,0,.12)!important;border:1px solid var(--border-light)!important;font-family:'Inter',sans-serif!important}
         .bfr-user-tip{background:#4285f4!important;color:#fff!important;border:none!important;font-weight:700!important;font-size:10px!important}
         .bfr-user-tip::before{border-top-color:#4285f4!important}
 
-        /* ── Pulsing GPS marker ── */
         .bfr-pulse-wrap{background:transparent!important;border:none!important}
         .bfr-pulse-ring{width:40px;height:40px;border-radius:50%;background:rgba(66,133,244,.25);animation:bpulse 2s ease-out infinite}
         @keyframes bpulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.2);opacity:0}}
@@ -1006,21 +974,8 @@ export default function BeforePage() {
         .fade-in{animation:bfade .3s ease-out forwards}
         @keyframes bfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
         @keyframes bspin{to{transform:rotate(360deg)}}
-
-        /* ── Step 4 ── */
-        .bfr-docs-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:24px;width:100%;max-width:900px}
-        .bfr-doc-card{background:#fff;border-radius:16px;border:1.5px solid var(--border-light);box-shadow:0 4px 20px rgba(61,27,17,.04);padding:24px;display:flex;flex-direction:column}
-        .bfr-doc-card.pgh{border-color:var(--primary);background:rgba(126,38,37,.02)}
-        .bfr-doc-h{display:flex;align-items:center;gap:12px;margin-bottom:20px}
-        .bfr-doc-i{width:40px;height:40px;border-radius:12px;background:var(--bg-muted);color:var(--text-primary);display:flex;align-items:center;justify-content:center}
-        .bfr-doc-i.pgh{background:var(--primary);color:#fff}
-        .bfr-doc-h h3{font-size:1.125rem;font-weight:800;color:var(--text-primary);margin:0}
-        .bfr-doc-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px}
-        .bfr-doc-item{display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-family:'Inter',sans-serif}
-        .bfr-doc-item input[type="checkbox"]{accent-color:var(--primary);width:18px;height:18px;margin-top:2px}
-        .bfr-doc-item span{font-size:.8125rem;color:var(--text-secondary);line-height:1.5}
-        .bfr-doc-item strong{font-size:.9375rem;font-weight:700;color:var(--text-primary)}
-      `}} />
+        `
+      }} />
     </div>
   )
 }

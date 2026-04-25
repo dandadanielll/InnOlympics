@@ -289,10 +289,10 @@ export function DocumentChecklist({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', paddingBottom: '40px' }}>
       {/* Progress bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-        <div style={{ flex: 1, height: '6px', background: '#f0ece4', borderRadius: '3px', overflow: 'hidden' }}>
-          <div style={{ width: `${(checkedCount / docs.length) * 100}%`, height: '100%', background: 'var(--primary)', borderRadius: '3px', transition: 'width 0.4s ease' }} />
+        <div style={{ flex: 1, height: '8px', background: '#d0c8b8', borderRadius: '4px', overflow: 'hidden' }}>
+          <div style={{ width: `${(checkedCount / docs.length) * 100}%`, height: '100%', background: 'var(--primary)', borderRadius: '4px', transition: 'width 0.4s ease' }} />
         </div>
-        <span style={{ fontSize: '12px', color: '#888', fontWeight: 600, whiteSpace: 'nowrap' }}>{checkedCount}/{docs.length} ready</span>
+        <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 700, whiteSpace: 'nowrap' }}>{checkedCount}/{docs.length} ready</span>
       </div>
 
       {docs.map(d => {
