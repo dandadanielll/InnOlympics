@@ -28,9 +28,8 @@ interface PatientRight {
 // ─── Sub-Components ──────────────────────────────────────────────────────────
 
 function PatientRightsSection() {
-  const { user, getLatestEncounter, updateEncounter, getAllEncounters } = useGabAiStore()
-  const rawEncounter = getLatestEncounter()
-  const encounter = rawEncounter?.phase === 'complete' || rawEncounter?.phase === 'after' ? null : rawEncounter
+  const { user, getCurrentEncounter, getLatestEncounter, updateEncounter, getAllEncounters } = useGabAiStore()
+  const encounter = getCurrentEncounter() || getLatestEncounter()
 
   const [rights, setRights] = useState<PatientRight[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,12 +50,30 @@ function PatientRightsSection() {
 
     const fetchRights = async () => {
       try {
+        // Derive facility level from tags if not explicitly in carePlan
+        let facilityLevel = encounter.carePlan?.facilityLevel || ''
+        if (!facilityLevel && encounter.selectedFacility?.tags) {
+          const tags = encounter.selectedFacility.tags.map((t: string) => t.toLowerCase())
+          if (tags.includes('tertiary') || tags.includes('level iii')) facilityLevel = 'Tertiary'
+          else if (tags.includes('level ii')) facilityLevel = 'Secondary'
+          else if (tags.includes('level i')) facilityLevel = 'Primary'
+          else if (encounter.selectedFacility.isBHC) facilityLevel = 'BHC'
+        }
+        
+        // Fallback to classification risk
+        if (!facilityLevel && encounter.classification?.risk) {
+          const risk = encounter.classification.risk.toLowerCase()
+          if (risk === 'high' || risk === 'emergency') facilityLevel = 'Tertiary'
+          else if (risk === 'moderate') facilityLevel = 'Secondary'
+          else facilityLevel = 'Primary'
+        }
+
         const res = await fetch('/api/gemini/rights', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             symptoms: encounter.symptoms,
-            facilityLevel: encounter.carePlan?.facilityLevel || '',
+            facilityLevel,
             philHealth: user?.philHealth || 'not-sure',
             language: user?.language || 'taglish',
             history: getAllEncounters().filter(e => e.id !== encounter.id).slice(-3) // last 3 past encounters
@@ -117,7 +134,7 @@ function PatientRightsSection() {
 }
 
 function RecallAssistantSection() {
-  const { user, getLatestEncounter, updateEncounter, getAllEncounters } = useGabAiStore()
+  const { user, getCurrentEncounter, getLatestEncounter, updateEncounter, getAllEncounters } = useGabAiStore()
   const [recallInput, setRecallInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [recallResult, setRecallResult] = useState<RecallResult | null>(null)
@@ -140,8 +157,7 @@ function RecallAssistantSection() {
   const [volume, setVolume] = useState(0)
   const visualizerCleanupRef = useRef<(() => void) | null>(null)
 
-  const rawEncounter = getLatestEncounter()
-  const currentEncounter = rawEncounter?.phase === 'complete' || rawEncounter?.phase === 'after' ? null : rawEncounter
+  const currentEncounter = getCurrentEncounter() || getLatestEncounter()
 
   useEffect(() => {
     setMounted(true)
@@ -641,7 +657,8 @@ function RecallAssistantSection() {
 }
 
 function DocumentScannerSection() {
-  const { getLatestEncounter, updateEncounter } = useGabAiStore()
+  const { getCurrentEncounter, getLatestEncounter, updateEncounter } = useGabAiStore()
+  const enc = getCurrentEncounter() || getLatestEncounter()
   const [scanned, setScanned] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -658,11 +675,9 @@ function DocumentScannerSection() {
     setTimeout(() => {
       setScanning(false)
       setScanned(true)
-      const rawEnc = getLatestEncounter()
-      const enc = rawEnc?.phase === 'complete' || rawEnc?.phase === 'after' ? null : rawEnc
       if (enc) {
         updateEncounter(enc.id, {
-          documentScans: [...enc.documentScans, { explanation: SCAN_RESULT, scannedAt: new Date().toISOString() }],
+          documentScans: [...(enc.documentScans || []), { explanation: SCAN_RESULT, scannedAt: new Date().toISOString() }],
         })
       }
     }, 1500)
@@ -735,13 +750,12 @@ function DocumentScannerSection() {
 
 function TaposNaCard() {
   const router = useRouter()
-  const { getLatestEncounter, updateEncounter } = useGabAiStore()
+  const { getCurrentEncounter, getLatestEncounter, updateEncounter } = useGabAiStore()
   const [loading, setLoading] = useState(false)
 
   const handleTaposNa = () => {
     setLoading(true)
-    const rawEnc = getLatestEncounter()
-    const enc = rawEnc?.phase === 'complete' || rawEnc?.phase === 'after' ? null : rawEnc
+    const enc = getCurrentEncounter() || getLatestEncounter()
     if (enc) updateEncounter(enc.id, { phase: 'complete' })
     router.push('/navigator/after')
   }
