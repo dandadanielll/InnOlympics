@@ -82,8 +82,8 @@ export default function Sidebar() {
           </Link>
           {isActive('/navigator/after') && (
             <>
-              <Link href="#share" className="sidebar-sublink">WhatsApp Share</Link>
               <Link href="#followup" className="sidebar-sublink">Follow-up Check</Link>
+              <Link href="#referral" className="sidebar-sublink">Referral Companion</Link>
               <Link href="#experience" className="sidebar-sublink">Community Log</Link>
             </>
           )}
