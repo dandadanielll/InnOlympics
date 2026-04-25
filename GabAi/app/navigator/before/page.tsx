@@ -47,6 +47,8 @@ const MODE_COLORS: Record<string, string> = {
 declare global { interface Window { L: any } }
 
 export default function BeforePage() {
+  const router = useRouter()
+  const { user, getAllEncounters } = useGabAiStore()
   const [completedStep1, setCompletedStep1] = useState(false)
   const [completedStep2, setCompletedStep2] = useState(false)
   const [completedStep3, setCompletedStep3] = useState(false)
@@ -104,6 +106,12 @@ export default function BeforePage() {
       f.district.toLowerCase().includes(locationText.toLowerCase())
     ).slice(0, 6)
     : []
+
+  useEffect(() => {
+    if (user?.city && !locationText && !locationSet) {
+      setLocationText(user.city)
+    }
+  }, [user, locationText, locationSet])
 
   // ── Filtering + Sorting Engine ──
   // Design: Secondary checkbox filters are HARD filters (remove facilities).
@@ -245,8 +253,8 @@ export default function BeforePage() {
     if (pulseMarkerRef.current) map.removeLayer(pulseMarkerRef.current)
 
     const pulseIcon = L.divIcon({
-      className: 'bfr-pulse-wrap',
-      html: `<div class="bfr-pulse-ring"></div>`,
+      className: 'phase-pulse-wrap',
+      html: `<div class="phase-pulse-ring"></div>`,
       iconSize: [40, 40],
       iconAnchor: [20, 20],
     })
@@ -260,7 +268,7 @@ export default function BeforePage() {
       weight: 4,
     })
       .addTo(map)
-      .bindTooltip('Your Location', { permanent: true, direction: 'top', offset: [0, -14], className: 'bfr-user-tip' })
+      .bindTooltip('Your Location', { permanent: true, direction: 'top', offset: [0, -14], className: 'phase-user-tip' })
 
     const nearbyBounds = L.latLngBounds([[lat, lng]])
     let countNearby = 0
@@ -304,7 +312,7 @@ export default function BeforePage() {
     markersRef.current.forEach(m => map.removeLayer(m)); markersRef.current = []
     if (!locationSet) return
 
-    const icon = L.divIcon({ className: 'bfr-marker', html: `<div style="width:22px;height:22px;border-radius:50%;background:var(--primary);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/></svg></div>`, iconSize: [22, 22], iconAnchor: [11, 22], popupAnchor: [0, -24] })
+    const icon = L.divIcon({ className: 'phase-marker', html: `<div style="width:22px;height:22px;border-radius:50%;background:var(--primary);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/></svg></div>`, iconSize: [22, 22], iconAnchor: [11, 22], popupAnchor: [0, -24] })
 
     visibleFacilities.forEach(f => {
       const dist = (f as any)._dist?.toFixed(1) || haversineKm(userLat!, userLng!, f.lat, f.lng).toFixed(1)
@@ -315,7 +323,7 @@ export default function BeforePage() {
 
       const marker = L.marker([f.lat, f.lng], { icon })
         .addTo(map)
-        .bindTooltip(`<div style="font-family:Inter,sans-serif"><div style="font-size:11px;font-weight:700;margin-bottom:1px">${f.name}</div><div style="font-size:10px;color:#666">${reason}</div></div>`, { direction: 'top', offset: [0, -4], className: 'bfr-tooltip' })
+        .bindTooltip(`<div style="font-family:Inter,sans-serif"><div style="font-size:11px;font-weight:700;margin-bottom:1px">${f.name}</div><div style="font-size:10px;color:#666">${reason}</div></div>`, { direction: 'top', offset: [0, -4], className: 'phase-tooltip' })
       marker.on('click', () => { setSelectedFacility(f); setShowGastosPrompt(true) })
       markersRef.current.push(marker)
     })
@@ -353,31 +361,31 @@ export default function BeforePage() {
     <div className="bfr">
 
       {/* ═══════ STEP 1 ═══════ */}
-      <section className="bfr-sec">
-        <div className="bfr-num-col"><div className={`bfr-circ ${completedStep1 ? 'done' : 'active'}`}>{completedStep1 ? <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg> : '1'}</div><div className={`bfr-line ${completedStep1 ? 'filled' : ''}`} /></div>
-        <div className="bfr-main bfr-s1-center">
-          <div className="bfr-s1-card">
-            <span className="bfr-tag">Patient Intake</span>
-            <h1 className="bfr-h1">What do you need?</h1>
-            <p className="bfr-p">Select the option that best describes your situation.</p>
-            <div className="bfr-choices">
-              <button className={`bfr-choice ${needType === 'diagnosis' ? 'on' : ''}`} onClick={() => setNeedType('diagnosis')}><div className="bfr-choice-i"><svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg></div><div className="bfr-choice-t"><strong>I have a diagnosis</strong><span>Follow-up on an existing condition or referral.</span></div>{needType === 'diagnosis' && <svg className="bfr-chk" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>}</button>
-              <button className={`bfr-choice ${needType === 'service' ? 'on' : ''}`} onClick={() => setNeedType('service')}><div className="bfr-choice-i"><svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 8v8M8 12h8" /></svg></div><div className="bfr-choice-t"><strong>I need a specific service</strong><span>Looking for an X-ray, lab, vaccination, etc.</span></div>{needType === 'service' && <svg className="bfr-chk" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>}</button>
+      <section className="phase-sec">
+        <div className="phase-num-col"><div className={`phase-circ ${completedStep1 ? 'done' : 'active'}`}>{completedStep1 ? <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg> : '1'}</div><div className={`phase-line ${completedStep1 ? 'filled' : ''}`} /></div>
+        <div className="phase-main phase-s1-center">
+          <div className="phase-s1-card">
+            <span className="phase-tag">Patient Intake</span>
+            <h1 className="phase-h1">What do you need?</h1>
+            <p className="phase-p">Select the option that best describes your situation.</p>
+            <div className="phase-choices">
+              <button className={`phase-choice ${needType === 'diagnosis' ? 'on' : ''}`} onClick={() => setNeedType('diagnosis')}><div className="phase-choice-i"><svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg></div><div className="phase-choice-t"><strong>I have a diagnosis</strong><span>Follow-up on an existing condition or referral.</span></div>{needType === 'diagnosis' && <svg className="phase-chk" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>}</button>
+              <button className={`phase-choice ${needType === 'service' ? 'on' : ''}`} onClick={() => setNeedType('service')}><div className="phase-choice-i"><svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 8v8M8 12h8" /></svg></div><div className="phase-choice-t"><strong>I need a specific service</strong><span>Looking for an X-ray, lab, vaccination, etc.</span></div>{needType === 'service' && <svg className="phase-chk" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>}</button>
             </div>
             {needType && (
-              <div className="bfr-inp-wrap fade-in">
-                <label className="bfr-lbl">{needType === 'diagnosis' ? 'What is your condition or diagnosis?' : 'What healthcare service do you need?'}</label>
-                <div className="bfr-sb-wrap">
-                  <div className="bfr-sb">
-                    <svg className="bfr-sb-icon" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                    <input className="bfr-sb-input" type="text" placeholder={needType === 'diagnosis' ? 'e.g., Hypertension, Suspected TB...' : 'e.g., Chest X-Ray, Blood extraction...'} value={query} onChange={e => { setQuery(e.target.value); setShowSuggestions(true) }} onFocus={() => { if (query.trim()) setShowSuggestions(true) }} onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} />
-                    <button className="bfr-sb-btn" disabled={!query.trim() || isClassifying || !!classification} onClick={handleStep1Submit}>
+              <div className="phase-inp-wrap fade-in">
+                <label className="phase-lbl">{needType === 'diagnosis' ? 'What is your condition or diagnosis?' : 'What healthcare service do you need?'}</label>
+                <div className="phase-sb-wrap">
+                  <div className="phase-sb">
+                    <svg className="phase-sb-icon" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                    <input className="phase-sb-input" type="text" placeholder={needType === 'diagnosis' ? 'e.g., Hypertension, Suspected TB...' : 'e.g., Chest X-Ray, Blood extraction...'} value={query} onChange={e => { setQuery(e.target.value); setShowSuggestions(true) }} onFocus={() => { if (query.trim()) setShowSuggestions(true) }} onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} />
+                    <button className="phase-sb-btn" disabled={!query.trim() || isClassifying || !!classification} onClick={handleStep1Submit}>
                       {isClassifying ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" style={{ animation: 'bspin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg> : <>Confirm & Route<svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg></>}
                     </button>
                   </div>
-                  {showSuggestions && filteredSuggestions.length > 0 && (<div className="bfr-ac">{filteredSuggestions.slice(0, 6).map(s => (<button key={s} className="bfr-ac-item" onMouseDown={() => { setQuery(s); setShowSuggestions(false) }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>{s}</button>))}</div>)}
+                  {showSuggestions && filteredSuggestions.length > 0 && (<div className="phase-ac">{filteredSuggestions.slice(0, 6).map(s => (<button key={s} className="phase-ac-item" onMouseDown={() => { setQuery(s); setShowSuggestions(false) }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>{s}</button>))}</div>)}
                 </div>
-                {classification && (<div className="bfr-cls fade-in"><svg width="18" height="18" fill="none" stroke="var(--success)" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg><div><strong>{classification.title}</strong><span>{classification.class} · {classification.risk}</span></div></div>)}
+                {classification && (<div className="phase-cls fade-in"><svg width="18" height="18" fill="none" stroke="var(--success)" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg><div><strong>{classification.title}</strong><span>{classification.class} · {classification.risk}</span></div></div>)}
               </div>
             )}
           </div>
@@ -385,51 +393,51 @@ export default function BeforePage() {
       </section>
 
       {/* ═══════ STEP 2 ═══════ */}
-      <section className={`bfr-sec ${completedStep1 ? '' : 'locked'}`} ref={step2Ref}>
-        <div className="bfr-num-col"><div className={`bfr-circ ${completedStep2 ? 'done' : completedStep1 ? 'active' : ''}`}>{completedStep2 ? <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg> : '2'}</div><div className={`bfr-line ${completedStep2 ? 'filled' : ''}`} /></div>
-        <div className="bfr-main">
+      <section className={`phase-sec ${completedStep1 ? '' : 'locked'}`} ref={step2Ref}>
+        <div className="phase-num-col"><div className={`phase-circ ${completedStep2 ? 'done' : completedStep1 ? 'active' : ''}`}>{completedStep2 ? <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg> : '2'}</div><div className={`phase-line ${completedStep2 ? 'filled' : ''}`} /></div>
+        <div className="phase-main">
           {/* ── DEPARTMENT BANNER (half-width) ── */}
           {classification && (
-            <div className="bfr-dept-banner">
-              <div className="bfr-dept-icon"><svg width="20" height="20" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg></div>
-              <div className="bfr-dept-text">
-                <span className="bfr-dept-label">Recommended Department</span>
-                <strong className="bfr-dept-name">{classification.class}</strong>
+            <div className="phase-dept-banner">
+              <div className="phase-dept-icon"><svg width="20" height="20" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg></div>
+              <div className="phase-dept-text">
+                <span className="phase-dept-label">Recommended Department</span>
+                <strong className="phase-dept-name">{classification.class}</strong>
               </div>
-              <span className="bfr-dept-badge">{classification.risk}</span>
+              <span className="phase-dept-badge">{classification.risk}</span>
             </div>
           )}
 
-          <span className="bfr-tag">Facility Routing</span>
-          <h1 className="bfr-h1">Locate a Facility</h1>
+          <span className="phase-tag">Facility Routing</span>
+          <h1 className="phase-h1">Locate a Facility</h1>
 
           {/* ── LOCATION BAR ── */}
-          <div className="bfr-locbar">
-            <div className="bfr-locbar-inner">
+          <div className="phase-locbar">
+            <div className="phase-locbar-inner">
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
-              <input className="bfr-locbar-input" type="text" placeholder="Type your location or click the map to pin..." value={locationText} onChange={e => { setLocationText(e.target.value); setShowLocSuggestions(true) }} onFocus={() => { if (locationText.trim().length > 1) setShowLocSuggestions(true) }} onBlur={() => setTimeout(() => setShowLocSuggestions(false), 200)} readOnly={locationSet} />
+              <input className="phase-locbar-input" type="text" placeholder="Type your location or click the map to pin..." value={locationText} onChange={e => { setLocationText(e.target.value); setShowLocSuggestions(true) }} onFocus={() => { if (locationText.trim().length > 1) setShowLocSuggestions(true) }} onBlur={() => setTimeout(() => setShowLocSuggestions(false), 200)} readOnly={locationSet} />
               {!locationSet ? (
                 <>
-                  <button className="bfr-locbar-gps" onClick={handleUseCurrentLocation} disabled={isLocating}>
+                  <button className="phase-locbar-gps" onClick={handleUseCurrentLocation} disabled={isLocating}>
                     {isLocating ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'bspin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg> : <><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>Use GPS</>}
                   </button>
                   {userLat !== null && (
-                    <button className="bfr-locbar-confirm" onClick={handleConfirmPinnedLocation}>
+                    <button className="phase-locbar-confirm" onClick={handleConfirmPinnedLocation}>
                       <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>
                       Confirm Pin
                     </button>
                   )}
                 </>
               ) : (
-                <button className="bfr-locbar-change" onClick={() => { setLocationSet(false); setLocationText('') }}>Change</button>
+                <button className="phase-locbar-change" onClick={() => { setLocationSet(false); setLocationText('') }}>Change</button>
               )}
             </div>
             {showLocSuggestions && locationSuggestions.length > 0 && (
-              <div className="bfr-loc-ac fade-in">
+              <div className="phase-loc-ac fade-in">
                 {locationSuggestions.map(f => (
-                  <button key={f.id} className="bfr-loc-ac-item" onMouseDown={() => handleSelectLocationSuggestion(f)}>
+                  <button key={f.id} className="phase-loc-ac-item" onMouseDown={() => handleSelectLocationSuggestion(f)}>
                     <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
-                    <div className="bfr-loc-ac-text">
+                    <div className="phase-loc-ac-text">
                       <strong>{f.name}</strong>
                       <span>{f.address} · {f.district}</span>
                     </div>
@@ -437,57 +445,57 @@ export default function BeforePage() {
                 ))}
               </div>
             )}
-            {!locationSet && !showLocSuggestions && <p className="bfr-locbar-hint">Set your location first — use GPS, type it, or click the map to drop a pin.</p>}
+            {!locationSet && !showLocSuggestions && <p className="phase-locbar-hint">Set your location first — use GPS, type it, or click the map to drop a pin.</p>}
           </div>
 
           {/* ── FILTER PILLS ── */}
           {locationSet && (
-            <div className="bfr-filter-bar fade-in">
-              <div className="bfr-pills">
-                <button className={`bfr-pill ${primarySort === 'best' ? 'on' : ''}`} onClick={() => setPrimarySort('best')}>
+            <div className="phase-filter-bar fade-in">
+              <div className="phase-pills">
+                <button className={`phase-pill ${primarySort === 'best' ? 'on' : ''}`} onClick={() => setPrimarySort('best')}>
                   <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
                   Best for My Need
                 </button>
-                <button className={`bfr-pill ${primarySort === 'nearest' ? 'on' : ''}`} onClick={() => setPrimarySort('nearest')}>
+                <button className={`phase-pill ${primarySort === 'nearest' ? 'on' : ''}`} onClick={() => setPrimarySort('nearest')}>
                   <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
                   Near Me (≤1hr)
                 </button>
-                <button className={`bfr-pill ${primarySort === 'free' ? 'on' : ''}`} onClick={() => setPrimarySort('free')}>
+                <button className={`phase-pill ${primarySort === 'free' ? 'on' : ''}`} onClick={() => setPrimarySort('free')}>
                   <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6" /></svg>
                   Free Services
                 </button>
               </div>
-              <div className="bfr-mf-wrap">
-                <button className="bfr-mf-btn" onClick={() => setShowFilters(!showFilters)}>
+              <div className="phase-mf-wrap">
+                <button className="phase-mf-btn" onClick={() => setShowFilters(!showFilters)}>
                   <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg>
-                  Filters {activeSecondaryCount > 0 && <span className="bfr-badge">{activeSecondaryCount}</span>}
+                  Filters {activeSecondaryCount > 0 && <span className="phase-badge">{activeSecondaryCount}</span>}
                 </button>
                 {showFilters && (
-                  <div className="bfr-mf-dd fade-in">
+                  <div className="phase-mf-dd fade-in">
                     {SECONDARY_FILTERS.map(sf => (
-                      <label key={sf.key} className="bfr-mf-item"><input type="checkbox" checked={!!secondaryFilters[sf.key]} onChange={() => toggleSecondary(sf.key)} /><span>{sf.label}</span></label>
+                      <label key={sf.key} className="phase-mf-item"><input type="checkbox" checked={!!secondaryFilters[sf.key]} onChange={() => toggleSecondary(sf.key)} /><span>{sf.label}</span></label>
                     ))}
-                    {activeSecondaryCount > 0 && <button className="bfr-mf-clear" onClick={clearFilters}>Clear all</button>}
+                    {activeSecondaryCount > 0 && <button className="phase-mf-clear" onClick={clearFilters}>Clear all</button>}
                   </div>
                 )}
               </div>
-              <span className="bfr-count">{visibleFacilities.length} of {FACILITIES.length} facilities</span>
+              <span className="phase-count">{visibleFacilities.length} of {FACILITIES.length} facilities</span>
             </div>
           )}
 
           {/* ── MAP + LIST GRID ── */}
-          <div className="bfr-s2-grid">
-            <div className="bfr-map-area">
-              <div ref={mapContainerRef} className="bfr-map" />
+          <div className="phase-s2-grid">
+            <div className="phase-map-area">
+              <div ref={mapContainerRef} className="phase-map" />
               {showGastosPrompt && selectedFacility && (
-                <div className="bfr-prompt fade-in">
-                  <div className="bfr-prompt-card">
+                <div className="phase-prompt fade-in">
+                  <div className="phase-prompt-card">
                     <h4>{selectedFacility.name}</h4>
                     <p>{selectedFacility.address}</p>
-                    <span className="bfr-prompt-r">{((selectedFacility as any)._dist || (userLat && userLng ? haversineKm(userLat, userLng, selectedFacility.lat, selectedFacility.lng) : 0)).toFixed?.(1) || '?'} km · {selectedFacility.type} · {selectedFacility.services.slice(0, 3).join(', ')}</span>
-                    <div className="bfr-prompt-btns">
-                      <button className="bfr-pri-btn" onClick={handleGoToStep3}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6" /></svg>Compute Travel & Gastos</button>
-                      <button className="bfr-ghost-btn" onClick={() => setShowGastosPrompt(false)}>Cancel</button>
+                    <span className="phase-prompt-r">{((selectedFacility as any)._dist || (userLat && userLng ? haversineKm(userLat, userLng, selectedFacility.lat, selectedFacility.lng) : 0)).toFixed?.(1) || '?'} km · {selectedFacility.type} · {selectedFacility.services.slice(0, 3).join(', ')}</span>
+                    <div className="phase-prompt-btns">
+                      <button className="phase-pri-btn" onClick={handleGoToStep3}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6" /></svg>Compute Travel & Gastos</button>
+                      <button className="phase-ghost-btn" onClick={() => setShowGastosPrompt(false)}>Cancel</button>
                     </div>
                   </div>
                 </div>
@@ -495,80 +503,80 @@ export default function BeforePage() {
             </div>
 
             {locationSet && visibleFacilities.length > 0 ? (
-              <div className="bfr-flist fade-in">
+              <div className="phase-flist fade-in">
                 {visibleFacilities.map(f => {
                   const dist = ((f as any)._dist ?? 0).toFixed(1)
                   const estMin = Math.round(parseFloat(dist) / TRAVEL_SPEED_KM_PER_HR * 60)
                   return (
-                    <button key={f.id} className={`bfr-fc ${selectedFacility?.id === f.id ? 'on' : ''}`} onClick={() => { setSelectedFacility(f); setShowGastosPrompt(true); mapRef.current?.setView([f.lat, f.lng], 15) }}>
-                      <div className="bfr-fc-top"><span>{f.district}</span><span className={f.isBHC || f.isPhilHealthKonsulta || f.hasMalasakitCenter || f.tags.some(t => t === 'DOH' || t === 'City-run') ? 'free' : ''}>{f.isBHC ? '• FREE (BHC)' : f.hasMalasakitCenter ? '• GOV\'T FREE' : f.tags.some(t => t === 'DOH' || t === 'City-run') ? '• GOV\'T' : f.isPhilHealthAccredited ? '• PHILHEALTH' : '• PRIVATE'}</span></div>
-                      <div className="bfr-fc-mid"><h4 style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>{f.name} {!f.unverified && <span style={{ fontSize: '11px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#ecfdf5', padding: '2px 6px', borderRadius: '12px', fontWeight: 600 }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg> Verified</span>}</h4><p>{f.address}</p><div className="bfr-fc-meta"><span className="bfr-fc-dist">{dist} km</span><span className="bfr-fc-time">~{estMin} min</span></div><div className="bfr-fc-tags">{f.tags.slice(0, 3).map(t => <span key={t}>{t}</span>)}</div></div>
+                    <button key={f.id} className={`phase-fc ${selectedFacility?.id === f.id ? 'on' : ''}`} onClick={() => { setSelectedFacility(f); setShowGastosPrompt(true); mapRef.current?.setView([f.lat, f.lng], 15) }}>
+                      <div className="phase-fc-top"><span>{f.district}</span><span className={f.isBHC || f.isPhilHealthKonsulta || f.hasMalasakitCenter || f.tags.some(t => t === 'DOH' || t === 'City-run') ? 'free' : ''}>{f.isBHC ? '• FREE (BHC)' : f.hasMalasakitCenter ? '• GOV\'T FREE' : f.tags.some(t => t === 'DOH' || t === 'City-run') ? '• GOV\'T' : f.isPhilHealthAccredited ? '• PHILHEALTH' : '• PRIVATE'}</span></div>
+                      <div className="phase-fc-mid"><h4 style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>{f.name} {!f.unverified && <span style={{ fontSize: '11px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#ecfdf5', padding: '2px 6px', borderRadius: '12px', fontWeight: 600 }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg> Verified</span>}</h4><p>{f.address}</p><div className="phase-fc-meta"><span className="phase-fc-dist">{dist} km</span><span className="phase-fc-time">~{estMin} min</span></div><div className="phase-fc-tags">{f.tags.slice(0, 3).map(t => <span key={t}>{t}</span>)}</div></div>
                     </button>
                   )
                 })}
               </div>
             ) : locationSet ? (
-              <div className="bfr-flist"><div className="bfr-empty"><p>Walang nahanap na pasilidad.</p><button className="bfr-ghost-btn" onClick={clearFilters}>Clear filters</button></div></div>
+              <div className="phase-flist"><div className="phase-empty"><p>Walang nahanap na pasilidad.</p><button className="phase-ghost-btn" onClick={clearFilters}>Clear filters</button></div></div>
             ) : null}
           </div>
         </div>
       </section>
 
       {/* ═══════ STEP 3 ═══════ */}
-      <section className={`bfr-sec ${completedStep2 ? '' : 'locked'}`} ref={step3Ref}>
-        <div className="bfr-num-col"><div className={`bfr-circ ${commutePlan ? 'done' : completedStep2 ? 'active' : ''}`}>3</div></div>
-        <div className="bfr-main">
-          <span className="bfr-tag">Commute & Expenses</span>
-          <h1 className="bfr-h1">Travel & Gastos</h1>
-          <p className="bfr-p">AI-generated transit plan grounded in official LTFRB fare matrices.</p>
-          {isPlanning && (<div className="bfr-loading"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" style={{ animation: 'bspin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg><strong>Analyzing Manila Transit</strong><span>Computing fare matrices…</span></div>)}
+      <section className={`phase-sec ${completedStep2 ? '' : 'locked'}`} ref={step3Ref}>
+        <div className="phase-num-col"><div className={`phase-circ ${commutePlan ? 'done' : completedStep2 ? 'active' : ''}`}>3</div></div>
+        <div className="phase-main">
+          <span className="phase-tag">Commute & Expenses</span>
+          <h1 className="phase-h1">Travel & Gastos</h1>
+          <p className="phase-p">AI-generated transit plan grounded in official LTFRB fare matrices.</p>
+          {isPlanning && (<div className="phase-loading"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" style={{ animation: 'bspin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg><strong>Analyzing Manila Transit</strong><span>Computing fare matrices…</span></div>)}
           {!isPlanning && commutePlan && selectedFacility && (
-            <div className="bfr-s3-grid fade-in">
+            <div className="phase-s3-grid fade-in">
               {/* Left: Receipt with vertical stepper legs */}
-              <div className="bfr-receipt">
-                <div className="bfr-rh"><span className="bfr-rl">DESTINATION</span><h2>{selectedFacility.name}</h2><p>{selectedFacility.address}</p></div>
+              <div className="phase-receipt">
+                <div className="phase-rh"><span className="phase-rl">DESTINATION</span><h2>{selectedFacility.name}</h2><p>{selectedFacility.address}</p></div>
 
                 {/* Vertical stepper legs */}
-                <div className="bfr-stepper">
+                <div className="phase-stepper">
                   {/* Origin node */}
-                  <div className="bfr-step-node">
-                    <div className="bfr-step-dot origin"><svg width="14" height="14" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg></div>
-                    <div className="bfr-step-body"><strong className="bfr-step-title">Your Location</strong><span className="bfr-step-sub">{locationText || 'Pinned on map'}</span></div>
+                  <div className="phase-step-node">
+                    <div className="phase-step-dot origin"><svg width="14" height="14" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg></div>
+                    <div className="phase-step-body"><strong className="phase-step-title">Your Location</strong><span className="phase-step-sub">{locationText || 'Pinned on map'}</span></div>
                   </div>
 
                   {commutePlan.legs.map((l, i) => {
                     const modeColor = MODE_COLORS[l.mode] || '#e67e22'
                     return (
-                      <div key={i} className="bfr-step-node">
-                        <div className="bfr-step-connector" style={{ background: modeColor }} />
-                        <div className="bfr-step-dot leg" style={{ background: modeColor }}>
+                      <div key={i} className="phase-step-node">
+                        <div className="phase-step-connector" style={{ background: modeColor }} />
+                        <div className="phase-step-dot leg" style={{ background: modeColor }}>
                           <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d={MODE_ICONS[l.mode] || MODE_ICONS['Jeepney']} fill="#fff" /></svg>
                         </div>
-                        <div className="bfr-step-body">
-                          <div className="bfr-step-head">
-                            <span className="bfr-step-mode" style={{ background: `${modeColor}15`, color: modeColor }}>{l.mode}</span>
-                            <span className="bfr-step-fare">₱ {l.fare.toFixed(2)}</span>
+                        <div className="phase-step-body">
+                          <div className="phase-step-head">
+                            <span className="phase-step-mode" style={{ background: `${modeColor}15`, color: modeColor }}>{l.mode}</span>
+                            <span className="phase-step-fare">₱ {l.fare.toFixed(2)}</span>
                           </div>
-                          <span className="bfr-step-desc">{l.instruction}</span>
+                          <span className="phase-step-desc">{l.instruction}</span>
                         </div>
                       </div>
                     )
                   })}
 
                   {/* Destination node */}
-                  <div className="bfr-step-node">
-                    <div className="bfr-step-connector dest" />
-                    <div className="bfr-step-dot dest"><svg width="14" height="14" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg></div>
-                    <div className="bfr-step-body"><strong className="bfr-step-title">{selectedFacility.name}</strong><span className="bfr-step-sub">{selectedFacility.address}</span></div>
+                  <div className="phase-step-node">
+                    <div className="phase-step-connector dest" />
+                    <div className="phase-step-dot dest"><svg width="14" height="14" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg></div>
+                    <div className="phase-step-body"><strong className="phase-step-title">{selectedFacility.name}</strong><span className="phase-step-sub">{selectedFacility.address}</span></div>
                   </div>
                 </div>
 
-                <div className="bfr-rtotals"><div><span className="bfr-rl">TRAVEL TIME</span><strong>{commutePlan.totalTime}</strong></div><div style={{ textAlign: 'right' }}><span className="bfr-rl">TOTAL GASTOS</span><strong className="bfr-rbig">₱ {commutePlan.totalFare.toFixed(2)}</strong></div></div>
-                <div style={{ padding: '16px 22px' }}><button className="bfr-pri-btn" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '14px' }} onClick={() => { setCompletedStep3(true); setTimeout(() => step4Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>Proceed to Document Checklist <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg></button></div>
+                <div className="phase-rtotals"><div><span className="phase-rl">TRAVEL TIME</span><strong>{commutePlan.totalTime}</strong></div><div style={{ textAlign: 'right' }}><span className="phase-rl">TOTAL GASTOS</span><strong className="phase-rbig">₱ {commutePlan.totalFare.toFixed(2)}</strong></div></div>
+                <div style={{ padding: '16px 22px' }}><button className="phase-pri-btn" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '14px' }} onClick={() => { setCompletedStep3(true); setTimeout(() => step4Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>Proceed to Document Checklist <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg></button></div>
               </div>
 
               {/* Right: Route Map */}
-              <div className="bfr-route-map-area">
+              <div className="phase-route-map-area">
                 <iframe
                   width="100%"
                   height="100%"
@@ -584,12 +592,12 @@ export default function BeforePage() {
       </section>
 
       {/* ═══════ STEP 4 ═══════ */}
-      <section className={`bfr-sec ${completedStep3 ? '' : 'locked'}`} ref={step4Ref}>
-        <div className="bfr-num-col"><div className="bfr-circ active">4</div></div>
-        <div className="bfr-main">
-          <span className="bfr-tag">Preparation</span>
-          <h1 className="bfr-h1">Requirements Checklist</h1>
-          <p className="bfr-p">Prepare these documents and requirements to ensure a smooth, free, or discounted service transaction.</p>
+      <section className={`phase-sec ${completedStep3 ? '' : 'locked'}`} ref={step4Ref}>
+        <div className="phase-num-col"><div className="phase-circ active">4</div></div>
+        <div className="phase-main">
+          <span className="phase-tag">Preparation</span>
+          <h1 className="phase-h1">Requirements Checklist</h1>
+          <p className="phase-p">Prepare these documents and requirements to ensure a smooth, free, or discounted service transaction.</p>
 
           <DocumentChecklist
             isPGH={Boolean(selectedFacility?.id === 'h4' || selectedFacility?.name.includes('Philippine General'))}
@@ -603,175 +611,175 @@ export default function BeforePage() {
       <style dangerouslySetInnerHTML={{
         __html: `
         .bfr{margin:-48px}
-        .bfr-sec{height:100vh;display:flex;padding:40px 48px;gap:24px;box-sizing:border-box;transition:opacity .4s,filter .4s;overflow:hidden}
-        .bfr-sec.locked{opacity:.15;pointer-events:none;filter:blur(3px)}
-        .bfr-num-col{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:44px;padding-top:2px}
-        .bfr-circ{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;border:2px solid var(--border);color:var(--text-muted);background:#fff;transition:all .35s;flex-shrink:0}
-        .bfr-circ.active{background:var(--text-primary);border-color:var(--text-primary);color:#fff}
-        .bfr-circ.done{background:var(--primary);border-color:var(--primary);color:#fff}
-        .bfr-line{flex:1;width:2px;background:var(--border-light);margin-top:10px;transition:background .4s}
-        .bfr-line.filled{background:var(--primary)}
-        .bfr-main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
-        .bfr-tag{display:inline-flex;align-items:center;gap:6px;font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--primary);background:var(--primary-light);padding:5px 14px;border-radius:20px;width:fit-content;margin-bottom:14px}
-        .bfr-h1{font-family:'Inter',-apple-system,sans-serif;font-size:2.5rem;font-weight:800;color:var(--text-primary);margin:0 0 10px;line-height:1.1;letter-spacing:-.03em}
-        .bfr-p{font-size:.9375rem;color:var(--text-secondary);line-height:1.6;margin:0 0 28px;max-width:560px}
+        .phase-sec{height:100vh;display:flex;padding:40px 48px;gap:24px;box-sizing:border-box;transition:opacity .4s,filter .4s;overflow:hidden}
+        .phase-sec.locked{opacity:.15;pointer-events:none;filter:blur(3px)}
+        .phase-num-col{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:44px;padding-top:2px}
+        .phase-circ{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;border:2px solid var(--border);color:var(--text-muted);background:#fff;transition:all .35s;flex-shrink:0}
+        .phase-circ.active{background:var(--text-primary);border-color:var(--text-primary);color:#fff}
+        .phase-circ.done{background:var(--primary);border-color:var(--primary);color:#fff}
+        .phase-line{flex:1;width:2px;background:var(--border-light);margin-top:10px;transition:background .4s}
+        .phase-line.filled{background:var(--primary)}
+        .phase-main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+        .phase-tag{display:inline-flex;align-items:center;gap:6px;font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--primary);background:var(--primary-light);padding:5px 14px;border-radius:20px;width:fit-content;margin-bottom:14px}
+        .phase-h1{font-family:'Inter',-apple-system,sans-serif;font-size:2.5rem;font-weight:800;color:var(--text-primary);margin:0 0 10px;line-height:1.1;letter-spacing:-.03em}
+        .phase-p{font-size:.9375rem;color:var(--text-secondary);line-height:1.6;margin:0 0 28px;max-width:560px}
 
         /* ── Step 1 centered container — LARGER ── */
-        .bfr-s1-center{justify-content:center;align-items:center}
-        .bfr-s1-card{width:100%;max-width:720px;text-align:left}
+        .phase-s1-center{justify-content:center;align-items:center}
+        .phase-s1-card{width:100%;max-width:720px;text-align:left}
 
-        .bfr-choices{display:flex;flex-direction:column;gap:16px;margin-bottom:28px}
-        .bfr-choice{display:flex;align-items:center;gap:22px;width:100%;text-align:left;padding:26px 30px;background:#fff;border:1.5px solid var(--border-light);border-radius:18px;cursor:pointer;transition:all .2s;font-family:inherit}
-        .bfr-choice:hover{border-color:rgba(126,38,37,.25)}
-        .bfr-choice.on{border-color:var(--primary);background:rgba(126,38,37,.02)}
-        .bfr-choice-i{width:62px;height:62px;border-radius:16px;background:var(--bg-muted);color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .bfr-choice.on .bfr-choice-i{background:var(--primary-light)}
-        .bfr-choice-t{flex:1}
-        .bfr-choice-t strong{display:block;font-size:1.125rem;font-weight:700;color:var(--text-primary);margin-bottom:4px}
-        .bfr-choice-t span{font-size:.9rem;color:var(--text-secondary)}
-        .bfr-chk{color:var(--primary);flex-shrink:0}
+        .phase-choices{display:flex;flex-direction:column;gap:16px;margin-bottom:28px}
+        .phase-choice{display:flex;align-items:center;gap:22px;width:100%;text-align:left;padding:26px 30px;background:#fff;border:1.5px solid var(--border-light);border-radius:18px;cursor:pointer;transition:all .2s;font-family:inherit}
+        .phase-choice:hover{border-color:rgba(126,38,37,.25)}
+        .phase-choice.on{border-color:var(--primary);background:rgba(126,38,37,.02)}
+        .phase-choice-i{width:62px;height:62px;border-radius:16px;background:var(--bg-muted);color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .phase-choice.on .phase-choice-i{background:var(--primary-light)}
+        .phase-choice-t{flex:1}
+        .phase-choice-t strong{display:block;font-size:1.125rem;font-weight:700;color:var(--text-primary);margin-bottom:4px}
+        .phase-choice-t span{font-size:.9rem;color:var(--text-secondary)}
+        .phase-chk{color:var(--primary);flex-shrink:0}
 
-        .bfr-inp-wrap{background:var(--bg-muted);border-radius:18px;padding:26px 30px}
-        .bfr-lbl{display:block;font-weight:700;font-size:.8125rem;color:var(--text-primary);margin-bottom:14px}
-        .bfr-sb-wrap{position:relative}
-        .bfr-sb{display:flex;align-items:center;background:#fff;border-radius:48px;padding:6px 6px 6px 20px;box-shadow:0 2px 8px rgba(61,27,17,.04)}
-        .bfr-sb-icon{color:var(--text-muted);flex-shrink:0;margin-right:12px}
-        .bfr-sb-input{flex:1;border:none;outline:none;background:transparent;font-size:.9375rem;color:var(--text-primary);font-family:'Inter',sans-serif;min-width:0;padding:6px 0}
-        .bfr-sb-input::placeholder{color:var(--text-muted)}
-        .bfr-sb-btn{display:inline-flex;align-items:center;gap:7px;background:var(--primary);color:#fff;border:none;border-radius:40px;padding:13px 24px;font-weight:700;font-size:.8125rem;cursor:pointer;transition:background .2s;white-space:nowrap;font-family:'Inter',sans-serif}
-        .bfr-sb-btn:hover{background:var(--primary-hover)}.bfr-sb-btn:disabled{opacity:.45;cursor:not-allowed}
-        .bfr-ac{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border-radius:12px;box-shadow:0 8px 28px rgba(61,27,17,.1);overflow:hidden;z-index:50;border:1px solid var(--border-light)}
-        .bfr-ac-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 20px;border:none;background:transparent;font-size:.875rem;color:var(--text-secondary);cursor:pointer;transition:all .15s;border-bottom:1px solid rgba(61,27,17,.04);font-family:'Inter',sans-serif}
-        .bfr-ac-item:last-child{border-bottom:none}.bfr-ac-item:hover{background:var(--bg-muted);color:var(--text-primary)}
-        .bfr-cls{display:flex;align-items:center;gap:12px;margin-top:14px;padding:14px 20px;background:#fff;border-radius:12px;border:1px solid var(--success-border)}
-        .bfr-cls div{display:flex;flex-direction:column;gap:2px}.bfr-cls strong{font-size:.875rem;color:var(--text-primary)}.bfr-cls span{font-size:.75rem;color:var(--text-secondary)}
+        .phase-inp-wrap{background:var(--bg-muted);border-radius:18px;padding:26px 30px}
+        .phase-lbl{display:block;font-weight:700;font-size:.8125rem;color:var(--text-primary);margin-bottom:14px}
+        .phase-sb-wrap{position:relative}
+        .phase-sb{display:flex;align-items:center;background:#fff;border-radius:48px;padding:6px 6px 6px 20px;box-shadow:0 2px 8px rgba(61,27,17,.04)}
+        .phase-sb-icon{color:var(--text-muted);flex-shrink:0;margin-right:12px}
+        .phase-sb-input{flex:1;border:none;outline:none;background:transparent;font-size:.9375rem;color:var(--text-primary);font-family:'Inter',sans-serif;min-width:0;padding:6px 0}
+        .phase-sb-input::placeholder{color:var(--text-muted)}
+        .phase-sb-btn{display:inline-flex;align-items:center;gap:7px;background:var(--primary);color:#fff;border:none;border-radius:40px;padding:13px 24px;font-weight:700;font-size:.8125rem;cursor:pointer;transition:background .2s;white-space:nowrap;font-family:'Inter',sans-serif}
+        .phase-sb-btn:hover{background:var(--primary-hover)}.phase-sb-btn:disabled{opacity:.45;cursor:not-allowed}
+        .phase-ac{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border-radius:12px;box-shadow:0 8px 28px rgba(61,27,17,.1);overflow:hidden;z-index:50;border:1px solid var(--border-light)}
+        .phase-ac-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 20px;border:none;background:transparent;font-size:.875rem;color:var(--text-secondary);cursor:pointer;transition:all .15s;border-bottom:1px solid rgba(61,27,17,.04);font-family:'Inter',sans-serif}
+        .phase-ac-item:last-child{border-bottom:none}.phase-ac-item:hover{background:var(--bg-muted);color:var(--text-primary)}
+        .phase-cls{display:flex;align-items:center;gap:12px;margin-top:14px;padding:14px 20px;background:#fff;border-radius:12px;border:1px solid var(--success-border)}
+        .phase-cls div{display:flex;flex-direction:column;gap:2px}.phase-cls strong{font-size:.875rem;color:var(--text-primary)}.phase-cls span{font-size:.75rem;color:var(--text-secondary)}
 
         /* ── DEPARTMENT BANNER (half-width) ── */
-        .bfr-dept-banner{display:flex;align-items:center;gap:14px;padding:14px 20px;background:var(--primary);border-radius:14px;margin-bottom:16px;color:#fff;max-width:50%}
-        .bfr-dept-icon{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .bfr-dept-text{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0}
-        .bfr-dept-label{font-size:.5625rem;text-transform:uppercase;letter-spacing:.1em;font-weight:600;opacity:.7}
-        .bfr-dept-name{font-size:1.125rem;font-weight:800;letter-spacing:-.01em}
-        .bfr-dept-badge{font-size:.625rem;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(255,255,255,.2);white-space:nowrap}
+        .phase-dept-banner{display:flex;align-items:center;gap:14px;padding:14px 20px;background:var(--primary);border-radius:14px;margin-bottom:16px;color:#fff;max-width:50%}
+        .phase-dept-icon{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .phase-dept-text{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0}
+        .phase-dept-label{font-size:.5625rem;text-transform:uppercase;letter-spacing:.1em;font-weight:600;opacity:.7}
+        .phase-dept-name{font-size:1.125rem;font-weight:800;letter-spacing:-.01em}
+        .phase-dept-badge{font-size:.625rem;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(255,255,255,.2);white-space:nowrap}
 
         /* ── LOCATION BAR ── */
-        .bfr-locbar{margin-bottom:12px;position:relative}
-        .bfr-locbar-inner{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--border-light);border-radius:14px;padding:8px 10px 8px 16px;max-width:calc(100% - 274px)}
-        .bfr-locbar-input{flex:1;border:none;outline:none;background:transparent;font-size:.8125rem;color:var(--text-primary);font-family:'Inter',sans-serif}
-        .bfr-locbar-input::placeholder{color:var(--text-muted)}
-        .bfr-locbar-gps,.bfr-locbar-confirm{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:10px;border:none;font-size:.6875rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;white-space:nowrap}
-        .bfr-locbar-gps{background:var(--bg-muted);color:var(--primary)}.bfr-locbar-gps:hover{background:var(--primary-light)}
-        .bfr-locbar-gps:disabled{opacity:.5;cursor:not-allowed}
-        .bfr-locbar-confirm{background:var(--primary);color:#fff}.bfr-locbar-confirm:hover{background:var(--primary-hover)}
-        .bfr-locbar-change{padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:transparent;font-size:.6875rem;font-weight:600;cursor:pointer;color:var(--text-secondary);font-family:'Inter',sans-serif}
-        .bfr-locbar-hint{font-size:.6875rem;color:var(--text-muted);margin:6px 0 0 4px;font-style:italic}
+        .phase-locbar{margin-bottom:12px;position:relative}
+        .phase-locbar-inner{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--border-light);border-radius:14px;padding:8px 10px 8px 16px;max-width:calc(100% - 274px)}
+        .phase-locbar-input{flex:1;border:none;outline:none;background:transparent;font-size:.8125rem;color:var(--text-primary);font-family:'Inter',sans-serif}
+        .phase-locbar-input::placeholder{color:var(--text-muted)}
+        .phase-locbar-gps,.phase-locbar-confirm{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:10px;border:none;font-size:.6875rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;white-space:nowrap}
+        .phase-locbar-gps{background:var(--bg-muted);color:var(--primary)}.phase-locbar-gps:hover{background:var(--primary-light)}
+        .phase-locbar-gps:disabled{opacity:.5;cursor:not-allowed}
+        .phase-locbar-confirm{background:var(--primary);color:#fff}.phase-locbar-confirm:hover{background:var(--primary-hover)}
+        .phase-locbar-change{padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:transparent;font-size:.6875rem;font-weight:600;cursor:pointer;color:var(--text-secondary);font-family:'Inter',sans-serif}
+        .phase-locbar-hint{font-size:.6875rem;color:var(--text-muted);margin:6px 0 0 4px;font-style:italic}
 
         /* ── Location autocomplete ── */
-        .bfr-loc-ac{position:absolute;top:100%;left:0;max-width:calc(100% - 274px);width:100%;background:#fff;border-radius:12px;box-shadow:0 8px 28px rgba(61,27,17,.12);border:1px solid var(--border-light);z-index:60;overflow:hidden;margin-top:4px}
-        .bfr-loc-ac-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 16px;border:none;background:transparent;cursor:pointer;transition:all .15s;border-bottom:1px solid rgba(61,27,17,.04);font-family:'Inter',sans-serif}
-        .bfr-loc-ac-item:last-child{border-bottom:none}
-        .bfr-loc-ac-item:hover{background:var(--bg-muted)}
-        .bfr-loc-ac-item svg{color:var(--primary);flex-shrink:0}
-        .bfr-loc-ac-text{display:flex;flex-direction:column;gap:1px;min-width:0}
-        .bfr-loc-ac-text strong{font-size:.75rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .bfr-loc-ac-text span{font-size:.625rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .phase-loc-ac{position:absolute;top:100%;left:0;max-width:calc(100% - 274px);width:100%;background:#fff;border-radius:12px;box-shadow:0 8px 28px rgba(61,27,17,.12);border:1px solid var(--border-light);z-index:60;overflow:hidden;margin-top:4px}
+        .phase-loc-ac-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 16px;border:none;background:transparent;cursor:pointer;transition:all .15s;border-bottom:1px solid rgba(61,27,17,.04);font-family:'Inter',sans-serif}
+        .phase-loc-ac-item:last-child{border-bottom:none}
+        .phase-loc-ac-item:hover{background:var(--bg-muted)}
+        .phase-loc-ac-item svg{color:var(--primary);flex-shrink:0}
+        .phase-loc-ac-text{display:flex;flex-direction:column;gap:1px;min-width:0}
+        .phase-loc-ac-text strong{font-size:.75rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .phase-loc-ac-text span{font-size:.625rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
         /* ── FILTER PILLS ── */
-        .bfr-filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;position:relative;z-index:10;background:var(--bg);padding:8px 14px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.05);border:1px solid var(--border-light);flex-shrink:0}
-        .bfr-pills{display:flex;gap:6px}
-        .bfr-pill{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:32px;border:1.5px solid var(--border);background:#fff;font-size:.75rem;font-weight:600;color:var(--text-secondary);cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
-        .bfr-pill:hover{background:var(--bg-muted)}.bfr-pill.on{background:var(--primary);border-color:var(--primary);color:#fff}
-        .bfr-mf-wrap{position:relative;margin-left:4px}
-        .bfr-mf-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:32px;border:1.5px solid var(--border);background:#fff;font-size:.75rem;font-weight:600;color:var(--text-secondary);cursor:pointer;font-family:'Inter',sans-serif}
-        .bfr-mf-btn:hover{background:var(--bg-muted)}
-        .bfr-badge{background:var(--primary);color:#fff;font-size:.5625rem;padding:1px 6px;border-radius:10px;font-weight:700}
-        .bfr-mf-dd{position:absolute;top:calc(100% + 6px);right:0;width:220px;background:#fff;border-radius:14px;box-shadow:0 8px 28px rgba(61,27,17,.12);border:1px solid var(--border-light);padding:6px 0;z-index:50}
-        .bfr-mf-item{display:flex;align-items:center;gap:8px;padding:8px 14px;font-size:.6875rem;color:var(--text-secondary);cursor:pointer;transition:background .15s}
-        .bfr-mf-item:hover{background:var(--bg-muted)}.bfr-mf-item input[type="checkbox"]{accent-color:var(--primary);width:14px;height:14px}.bfr-mf-item span{flex:1}
-        .bfr-mf-clear{width:100%;padding:8px 14px;text-align:center;font-size:.625rem;font-weight:700;color:var(--primary);background:transparent;border:none;border-top:1px solid var(--border-light);cursor:pointer;font-family:'Inter',sans-serif}
-        .bfr-count{font-size:.6875rem;color:var(--text-muted);font-weight:600;margin-left:auto}
+        .phase-filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;position:relative;z-index:10;background:var(--bg);padding:8px 14px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.05);border:1px solid var(--border-light);flex-shrink:0}
+        .phase-pills{display:flex;gap:6px}
+        .phase-pill{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:32px;border:1.5px solid var(--border);background:#fff;font-size:.75rem;font-weight:600;color:var(--text-secondary);cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
+        .phase-pill:hover{background:var(--bg-muted)}.phase-pill.on{background:var(--primary);border-color:var(--primary);color:#fff}
+        .phase-mf-wrap{position:relative;margin-left:4px}
+        .phase-mf-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:32px;border:1.5px solid var(--border);background:#fff;font-size:.75rem;font-weight:600;color:var(--text-secondary);cursor:pointer;font-family:'Inter',sans-serif}
+        .phase-mf-btn:hover{background:var(--bg-muted)}
+        .phase-badge{background:var(--primary);color:#fff;font-size:.5625rem;padding:1px 6px;border-radius:10px;font-weight:700}
+        .phase-mf-dd{position:absolute;top:calc(100% + 6px);right:0;width:220px;background:#fff;border-radius:14px;box-shadow:0 8px 28px rgba(61,27,17,.12);border:1px solid var(--border-light);padding:6px 0;z-index:50}
+        .phase-mf-item{display:flex;align-items:center;gap:8px;padding:8px 14px;font-size:.6875rem;color:var(--text-secondary);cursor:pointer;transition:background .15s}
+        .phase-mf-item:hover{background:var(--bg-muted)}.phase-mf-item input[type="checkbox"]{accent-color:var(--primary);width:14px;height:14px}.phase-mf-item span{flex:1}
+        .phase-mf-clear{width:100%;padding:8px 14px;text-align:center;font-size:.625rem;font-weight:700;color:var(--primary);background:transparent;border:none;border-top:1px solid var(--border-light);cursor:pointer;font-family:'Inter',sans-serif}
+        .phase-count{font-size:.6875rem;color:var(--text-muted);font-weight:600;margin-left:auto}
 
         /* ── GRID: map-first, list-sidebar ── */
-        .bfr-s2-grid{display:grid;grid-template-columns:1fr 260px;gap:14px;flex:1;min-height:0;overflow:hidden}
-        .bfr-map-area{position:relative;border-radius:14px;overflow:hidden;min-height:0}
-        .bfr-map{width:100%;height:100%;z-index:1}
-        .bfr-flist{display:flex;flex-direction:column;gap:6px;overflow-y:auto;padding-right:4px}
-        .bfr-fc{width:100%;text-align:left;background:#fff;border:1.5px solid var(--border-light);border-radius:10px;overflow:hidden;cursor:pointer;transition:all .2s;font-family:inherit;flex-shrink:0}
-        .bfr-fc:hover{border-color:var(--border)}.bfr-fc.on{border-color:var(--primary);box-shadow:0 2px 12px rgba(126,38,37,.08)}
-        .bfr-fc-top{display:flex;justify-content:space-between;padding:6px 12px;border-bottom:1px solid var(--border-light);font-size:.4375rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--text-muted)}
-        .bfr-fc-top .free{color:var(--success)}
-        .bfr-fc-mid{padding:10px 12px}
-        .bfr-fc-mid h4{font-size:.75rem;font-weight:700;margin:0 0 2px;color:var(--text-primary)}
-        .bfr-fc-mid p{font-size:.5625rem;color:var(--text-secondary);margin:0 0 6px}
-        .bfr-fc-meta{display:flex;gap:8px;margin-bottom:6px}
-        .bfr-fc-dist{font-size:.5625rem;font-weight:700;color:var(--primary);background:var(--primary-light);padding:2px 8px;border-radius:20px}
-        .bfr-fc-time{font-size:.5625rem;font-weight:600;color:var(--text-muted);background:var(--bg-muted);padding:2px 8px;border-radius:20px}
-        .bfr-fc-tags{display:flex;gap:3px;flex-wrap:wrap}
-        .bfr-fc-tags span{font-size:.4375rem;padding:1px 6px;border-radius:20px;background:var(--bg-muted);color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+        .phase-s2-grid{display:grid;grid-template-columns:1fr 260px;gap:14px;flex:1;min-height:0;overflow:hidden}
+        .phase-map-area{position:relative;border-radius:14px;overflow:hidden;min-height:0}
+        .phase-map{width:100%;height:100%;z-index:1}
+        .phase-flist{display:flex;flex-direction:column;gap:6px;overflow-y:auto;padding-right:4px}
+        .phase-fc{width:100%;text-align:left;background:#fff;border:1.5px solid var(--border-light);border-radius:10px;overflow:hidden;cursor:pointer;transition:all .2s;font-family:inherit;flex-shrink:0}
+        .phase-fc:hover{border-color:var(--border)}.phase-fc.on{border-color:var(--primary);box-shadow:0 2px 12px rgba(126,38,37,.08)}
+        .phase-fc-top{display:flex;justify-content:space-between;padding:6px 12px;border-bottom:1px solid var(--border-light);font-size:.4375rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--text-muted)}
+        .phase-fc-top .free{color:var(--success)}
+        .phase-fc-mid{padding:10px 12px}
+        .phase-fc-mid h4{font-size:.75rem;font-weight:700;margin:0 0 2px;color:var(--text-primary)}
+        .phase-fc-mid p{font-size:.5625rem;color:var(--text-secondary);margin:0 0 6px}
+        .phase-fc-meta{display:flex;gap:8px;margin-bottom:6px}
+        .phase-fc-dist{font-size:.5625rem;font-weight:700;color:var(--primary);background:var(--primary-light);padding:2px 8px;border-radius:20px}
+        .phase-fc-time{font-size:.5625rem;font-weight:600;color:var(--text-muted);background:var(--bg-muted);padding:2px 8px;border-radius:20px}
+        .phase-fc-tags{display:flex;gap:3px;flex-wrap:wrap}
+        .phase-fc-tags span{font-size:.4375rem;padding:1px 6px;border-radius:20px;background:var(--bg-muted);color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 
-        .bfr-empty{padding:24px;text-align:center}.bfr-empty p{font-size:.8125rem;color:var(--text-secondary);margin:0 0 10px}
+        .phase-empty{padding:24px;text-align:center}.phase-empty p{font-size:.8125rem;color:var(--text-secondary);margin:0 0 10px}
 
-        .bfr-prompt{position:absolute;bottom:14px;left:14px;right:14px;z-index:20}
-        .bfr-prompt-card{background:#fff;border-radius:14px;padding:16px 18px;box-shadow:0 6px 24px rgba(0,0,0,.15)}
-        .bfr-prompt-card h4{font-size:.875rem;font-weight:800;margin:0 0 2px;color:var(--text-primary)}
-        .bfr-prompt-card p{font-size:.6875rem;color:var(--text-secondary);margin:0 0 4px}
-        .bfr-prompt-r{font-size:.625rem;color:var(--primary);font-weight:600;display:block;margin-bottom:10px}
-        .bfr-prompt-btns{display:flex;gap:8px}
-        .bfr-pri-btn{display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:#fff;border:none;border-radius:40px;padding:9px 18px;font-weight:700;font-size:.6875rem;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
-        .bfr-pri-btn:hover{background:var(--primary-hover)}.bfr-pri-btn:disabled{opacity:.35;cursor:not-allowed}
-        .bfr-ghost-btn{background:transparent;border:1.5px solid var(--border);border-radius:40px;padding:9px 14px;font-weight:600;font-size:.6875rem;cursor:pointer;color:var(--text-secondary);font-family:'Inter',sans-serif;transition:all .2s}
-        .bfr-ghost-btn:hover{background:var(--bg-muted)}
+        .phase-prompt{position:absolute;bottom:14px;left:14px;right:14px;z-index:20}
+        .phase-prompt-card{background:#fff;border-radius:14px;padding:16px 18px;box-shadow:0 6px 24px rgba(0,0,0,.15)}
+        .phase-prompt-card h4{font-size:.875rem;font-weight:800;margin:0 0 2px;color:var(--text-primary)}
+        .phase-prompt-card p{font-size:.6875rem;color:var(--text-secondary);margin:0 0 4px}
+        .phase-prompt-r{font-size:.625rem;color:var(--primary);font-weight:600;display:block;margin-bottom:10px}
+        .phase-prompt-btns{display:flex;gap:8px}
+        .phase-pri-btn{display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:#fff;border:none;border-radius:40px;padding:9px 18px;font-weight:700;font-size:.6875rem;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
+        .phase-pri-btn:hover{background:var(--primary-hover)}.phase-pri-btn:disabled{opacity:.35;cursor:not-allowed}
+        .phase-ghost-btn{background:transparent;border:1.5px solid var(--border);border-radius:40px;padding:9px 14px;font-weight:600;font-size:.6875rem;cursor:pointer;color:var(--text-secondary);font-family:'Inter',sans-serif;transition:all .2s}
+        .phase-ghost-btn:hover{background:var(--bg-muted)}
 
         /* ═══════ STEP 3 — REDESIGNED ═══════ */
-        .bfr-loading{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center}
-        .bfr-loading strong{font-size:1rem;font-weight:800;color:var(--text-primary)}.bfr-loading span{font-size:.75rem;color:var(--text-secondary)}
+        .phase-loading{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center}
+        .phase-loading strong{font-size:1rem;font-weight:800;color:var(--text-primary)}.phase-loading span{font-size:.75rem;color:var(--text-secondary)}
 
         /* Grid: receipt left + map right */
-        .bfr-s3-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;flex:1;min-height:0;overflow:hidden}
+        .phase-s3-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;flex:1;min-height:0;overflow:hidden}
 
-        .bfr-receipt{background:#fff;border-radius:16px;border:1.5px solid var(--border-light);box-shadow:0 4px 20px rgba(61,27,17,.04);overflow-y:auto;display:flex;flex-direction:column}
-        .bfr-rh{padding:18px 22px;border-bottom:1px dashed var(--border-light);flex-shrink:0}
-        .bfr-rl{font-size:.5rem;text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--text-muted);display:block;margin-bottom:3px}
-        .bfr-rh h2{font-size:1.25rem;font-weight:800;color:var(--primary);margin:0 0 2px}.bfr-rh p{font-size:.6875rem;color:var(--text-secondary);margin:0}
+        .phase-receipt{background:#fff;border-radius:16px;border:1.5px solid var(--border-light);box-shadow:0 4px 20px rgba(61,27,17,.04);overflow-y:auto;display:flex;flex-direction:column}
+        .phase-rh{padding:18px 22px;border-bottom:1px dashed var(--border-light);flex-shrink:0}
+        .phase-rl{font-size:.5rem;text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--text-muted);display:block;margin-bottom:3px}
+        .phase-rh h2{font-size:1.25rem;font-weight:800;color:var(--primary);margin:0 0 2px}.phase-rh p{font-size:.6875rem;color:var(--text-secondary);margin:0}
 
         /* ── Vertical stepper ── */
-        .bfr-stepper{padding:16px 22px;flex:1;display:flex;flex-direction:column}
-        .bfr-step-node{position:relative;display:flex;align-items:flex-start;gap:14px;padding-bottom:0}
-        .bfr-step-connector{position:absolute;left:16px;top:-2px;width:3px;height:calc(100% + 2px);border-radius:2px;z-index:0}
-        .bfr-step-connector.dest{background:var(--primary)!important}
-        .bfr-step-dot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-        .bfr-step-dot.origin{background:#4285f4}
-        .bfr-step-dot.dest{background:var(--primary)}
-        .bfr-step-dot.leg{border:3px solid #fff}
-        .bfr-step-body{flex:1;padding-bottom:18px;min-width:0}
-        .bfr-step-title{font-size:.8125rem;font-weight:700;color:var(--text-primary);display:block}
-        .bfr-step-sub{font-size:.6875rem;color:var(--text-secondary);display:block;margin-top:1px}
-        .bfr-step-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
-        .bfr-step-mode{font-size:.6875rem;font-weight:700;padding:4px 12px;border-radius:20px;display:inline-block}
-        .bfr-step-fare{font-size:.875rem;font-weight:800;color:var(--text-primary)}
-        .bfr-step-desc{font-size:.6875rem;color:var(--text-secondary);line-height:1.55;display:block}
+        .phase-stepper{padding:16px 22px;flex:1;display:flex;flex-direction:column}
+        .phase-step-node{position:relative;display:flex;align-items:flex-start;gap:14px;padding-bottom:0}
+        .phase-step-connector{position:absolute;left:16px;top:-2px;width:3px;height:calc(100% + 2px);border-radius:2px;z-index:0}
+        .phase-step-connector.dest{background:var(--primary)!important}
+        .phase-step-dot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+        .phase-step-dot.origin{background:#4285f4}
+        .phase-step-dot.dest{background:var(--primary)}
+        .phase-step-dot.leg{border:3px solid #fff}
+        .phase-step-body{flex:1;padding-bottom:18px;min-width:0}
+        .phase-step-title{font-size:.8125rem;font-weight:700;color:var(--text-primary);display:block}
+        .phase-step-sub{font-size:.6875rem;color:var(--text-secondary);display:block;margin-top:1px}
+        .phase-step-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+        .phase-step-mode{font-size:.6875rem;font-weight:700;padding:4px 12px;border-radius:20px;display:inline-block}
+        .phase-step-fare{font-size:.875rem;font-weight:800;color:var(--text-primary)}
+        .phase-step-desc{font-size:.6875rem;color:var(--text-secondary);line-height:1.55;display:block}
 
-        .bfr-rtotals{display:flex;justify-content:space-between;align-items:flex-end;padding:16px 22px;background:var(--bg-muted);border-top:1px solid var(--border-light);flex-shrink:0}
-        .bfr-rtotals>div{display:flex;flex-direction:column;gap:3px}.bfr-rtotals strong{font-size:.9375rem;font-weight:800}
-        .bfr-rbig{font-size:1.375rem!important;color:var(--primary)}
+        .phase-rtotals{display:flex;justify-content:space-between;align-items:flex-end;padding:16px 22px;background:var(--bg-muted);border-top:1px solid var(--border-light);flex-shrink:0}
+        .phase-rtotals>div{display:flex;flex-direction:column;gap:3px}.phase-rtotals strong{font-size:.9375rem;font-weight:800}
+        .phase-rbig{font-size:1.375rem!important;color:var(--primary)}
 
         /* ── Route Map (right side) ── */
-        .bfr-route-map-area{border-radius:16px;overflow:hidden;position:relative;min-height:0;display:flex;flex-direction:column}
-        .bfr-route-map{flex:1;min-height:300px;z-index:1}
-        .bfr-route-legend{display:flex;gap:10px;padding:8px 14px;background:#fff;border-top:1px solid var(--border-light);flex-shrink:0;flex-wrap:wrap}
-        .bfr-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:.625rem;font-weight:700;color:var(--text-secondary);font-family:'Inter',sans-serif}
-        .bfr-legend-line{width:22px;height:4px;border-radius:2px;display:inline-block}
-        .bfr-route-marker{background:transparent!important;border:none!important}
+        .phase-route-map-area{border-radius:16px;overflow:hidden;position:relative;min-height:0;display:flex;flex-direction:column}
+        .phase-route-map{flex:1;min-height:300px;z-index:1}
+        .phase-route-legend{display:flex;gap:10px;padding:8px 14px;background:#fff;border-top:1px solid var(--border-light);flex-shrink:0;flex-wrap:wrap}
+        .phase-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:.625rem;font-weight:700;color:var(--text-secondary);font-family:'Inter',sans-serif}
+        .phase-legend-line{width:22px;height:4px;border-radius:2px;display:inline-block}
+        .phase-route-marker{background:transparent!important;border:none!important}
 
         /* ── Leaflet overrides ── */
-        .bfr-marker{background:transparent!important;border:none!important}
+        .phase-marker{background:transparent!important;border:none!important}
         .leaflet-tooltip{border-radius:8px!important;padding:7px 10px!important;box-shadow:0 4px 12px rgba(0,0,0,.12)!important;border:1px solid var(--border-light)!important;font-family:'Inter',sans-serif!important}
-        .bfr-user-tip{background:#4285f4!important;color:#fff!important;border:none!important;font-weight:700!important;font-size:10px!important}
-        .bfr-user-tip::before{border-top-color:#4285f4!important}
+        .phase-user-tip{background:#4285f4!important;color:#fff!important;border:none!important;font-weight:700!important;font-size:10px!important}
+        .phase-user-tip::before{border-top-color:#4285f4!important}
 
         /* ── Pulsing GPS marker ── */
-        .bfr-pulse-wrap{background:transparent!important;border:none!important}
-        .bfr-pulse-ring{width:40px;height:40px;border-radius:50%;background:rgba(66,133,244,.25);animation:bpulse 2s ease-out infinite}
+        .phase-pulse-wrap{background:transparent!important;border:none!important}
+        .phase-pulse-ring{width:40px;height:40px;border-radius:50%;background:rgba(66,133,244,.25);animation:bpulse 2s ease-out infinite}
         @keyframes bpulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.2);opacity:0}}
 
         .fade-in{animation:bfade .3s ease-out forwards}
@@ -779,19 +787,20 @@ export default function BeforePage() {
         @keyframes bspin{to{transform:rotate(360deg)}}
 
         /* ── Step 4 ── */
-        .bfr-docs-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:24px;width:100%;max-width:900px}
-        .bfr-doc-card{background:#fff;border-radius:16px;border:1.5px solid var(--border-light);box-shadow:0 4px 20px rgba(61,27,17,.04);padding:24px;display:flex;flex-direction:column}
-        .bfr-doc-card.pgh{border-color:var(--primary);background:rgba(126,38,37,.02)}
-        .bfr-doc-h{display:flex;align-items:center;gap:12px;margin-bottom:20px}
-        .bfr-doc-i{width:40px;height:40px;border-radius:12px;background:var(--bg-muted);color:var(--text-primary);display:flex;align-items:center;justify-content:center}
-        .bfr-doc-i.pgh{background:var(--primary);color:#fff}
-        .bfr-doc-h h3{font-size:1.125rem;font-weight:800;color:var(--text-primary);margin:0}
-        .bfr-doc-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px}
-        .bfr-doc-item{display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-family:'Inter',sans-serif}
-        .bfr-doc-item input[type="checkbox"]{accent-color:var(--primary);width:18px;height:18px;margin-top:2px}
-        .bfr-doc-item span{font-size:.8125rem;color:var(--text-secondary);line-height:1.5}
-        .bfr-doc-item strong{font-size:.9375rem;font-weight:700;color:var(--text-primary)}
+        .phase-docs-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:24px;width:100%;max-width:900px}
+        .phase-doc-card{background:#fff;border-radius:16px;border:1.5px solid var(--border-light);box-shadow:0 4px 20px rgba(61,27,17,.04);padding:24px;display:flex;flex-direction:column}
+        .phase-doc-card.pgh{border-color:var(--primary);background:rgba(126,38,37,.02)}
+        .phase-doc-h{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+        .phase-doc-i{width:40px;height:40px;border-radius:12px;background:var(--bg-muted);color:var(--text-primary);display:flex;align-items:center;justify-content:center}
+        .phase-doc-i.pgh{background:var(--primary);color:#fff}
+        .phase-doc-h h3{font-size:1.125rem;font-weight:800;color:var(--text-primary);margin:0}
+        .phase-doc-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px}
+        .phase-doc-item{display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-family:'Inter',sans-serif}
+        .phase-doc-item input[type="checkbox"]{accent-color:var(--primary);width:18px;height:18px;margin-top:2px}
+        .phase-doc-item span{font-size:.8125rem;color:var(--text-secondary);line-height:1.5}
+        .phase-doc-item strong{font-size:.9375rem;font-weight:700;color:var(--text-primary)}
       `}} />
     </div>
   )
 }
+

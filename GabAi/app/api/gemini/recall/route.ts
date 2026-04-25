@@ -8,18 +8,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
     }
     
-    const { recallInput, audioBase64, mimeType, script, language } = (await req.json()) as {
+    const { recallInput, audioBase64, mimeType, script, language, history } = (await req.json()) as {
       recallInput?: string
       audioBase64?: string
       mimeType?: string
       script?: string
       language?: string
+      history?: any[]
     }
 
     const systemPrompt = `
 You are a highly capable Philippine medical instruction parser.
 Your job is to listen to the patient's raw audio recording (if provided) and read their text notes (if any) from their clinic visit.
 You must accurately transcribe the audio and reconstruct their notes into clear, structured, actionable instructions.
+
+Context Memory (Alaala Ko):
+- Previous Encounters: ${JSON.stringify(history || [])}
+Use this history to understand if the patient is referring to previous medications or follow-up symptoms.
 
 Inputs:
 - Patient's Raw Text Notes (from Voice-to-Text UI): "${recallInput || 'None'}"

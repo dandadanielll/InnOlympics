@@ -8,15 +8,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
     }
 
-    const { symptoms, facilityLevel, philHealth, language } = (await req.json()) as {
+    const { symptoms, facilityLevel, philHealth, language, history } = (await req.json()) as {
       symptoms: string
       facilityLevel: string
       philHealth: string
       language: string
+      history?: any[]
     }
 
     const systemPrompt = `
 You are a Philippine Patient Rights advocate. Your job is to generate 3 to 5 highly relevant patient rights and practical reminders based on the user's specific context, disposition, and the Philippine healthcare system.
+
+Context Memory (Alaala Ko):
+- Previous Encounters: ${JSON.stringify(history || [])}
+Use this history to see if they are returning for the same issue and if they have recurring rights (like right to follow-up).
 
 User context:
 - Symptoms/Condition: ${symptoms || 'Unknown'}

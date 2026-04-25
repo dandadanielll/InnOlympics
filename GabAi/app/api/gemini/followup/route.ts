@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
-    const { followUpStatus, userMessage, symptoms, toRemember, language } = await req.json()
+    const { followUpStatus, userMessage, symptoms, toRemember, language, history } = await req.json()
 
     const apiKey = process.env.GABAI_GEMINI_KEY || process.env.GEMINI_API_KEY
     if (!apiKey) {
@@ -12,6 +12,10 @@ export async function POST(req: NextRequest) {
     const prompt = `
 You are a Filipino patient follow-up care advisor.
 A patient recently visited a health facility and is now checking in on their recovery status.
+
+Context Memory (Alaala Ko):
+- Previous Encounters: ${JSON.stringify(history || [])}
+Use this history to see if they have recurring issues.
 
 Patient context:
 - Original symptoms: ${symptoms || 'Hindi tinukoy'}

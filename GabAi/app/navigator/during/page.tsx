@@ -28,7 +28,7 @@ interface PatientRight {
 // ─── Sub-Components ──────────────────────────────────────────────────────────
 
 function PatientRightsSection() {
-  const { user, getLatestEncounter, updateEncounter } = useGabAiStore()
+  const { user, getLatestEncounter, updateEncounter, getAllEncounters } = useGabAiStore()
   const rawEncounter = getLatestEncounter()
   const encounter = rawEncounter?.phase === 'complete' || rawEncounter?.phase === 'after' ? null : rawEncounter
 
@@ -58,7 +58,8 @@ function PatientRightsSection() {
             symptoms: encounter.symptoms,
             facilityLevel: encounter.carePlan?.facilityLevel || '',
             philHealth: user?.philHealth || 'not-sure',
-            language: user?.language || 'taglish'
+            language: user?.language || 'taglish',
+            history: getAllEncounters().filter(e => e.id !== encounter.id).slice(-3) // last 3 past encounters
           })
         })
         const data = await res.json()
@@ -84,47 +85,39 @@ function PatientRightsSection() {
   if (!mounted) return null
 
   return (
-    <section id="rights" className="feature-anchor">
-      <div className="section-eyebrow" style={{ color: 'var(--warning)', marginBottom: '8px' }}>1. Alamin ang Iyong Karapatan</div>
-      <h2 className="text-h2" style={{ marginBottom: '8px' }}>Mga Paalala Para Sayo</h2>
-      <p className="text-body text-secondary" style={{ maxWidth: '600px', marginBottom: '20px' }}>
-        Ayon sa iyong sitwasyon at pasilidad na pupuntahan, ito ang mga karapatan mo bilang pasyente:
-      </p>
-
-      <div className="card" style={{ borderTop: '4px solid var(--warning)', opacity: (!encounter || !encounter.symptoms) ? 0.6 : 1 }}>
-        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-          {(!encounter || !encounter.symptoms) ? (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <p className="text-sm text-secondary">Kinakailangan ang <b>Phase 1 (Intake)</b> para makita ang mga karapatang ito.</p>
-              <button
-                className="btn btn-ghost btn-sm"
-                style={{ marginTop: '12px', color: 'var(--warning)' }}
-                onClick={() => window.location.href = '/navigator/before'}
-              >
-                ← Bumalik sa Phase 1
-              </button>
+    <div className="card" style={{ borderTop: '4px solid var(--warning)', opacity: (!encounter || !encounter.symptoms) ? 0.6 : 1 }}>
+      <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+        {(!encounter || !encounter.symptoms) ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <p className="text-sm text-secondary">Kinakailangan ang <b>Phase 1 (Intake)</b> para makita ang mga karapatang ito.</p>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ marginTop: '12px', color: 'var(--warning)' }}
+              onClick={() => window.location.href = '/navigator/before'}
+            >
+              ← Bumalik sa Phase 1
+            </button>
+          </div>
+        ) : loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="skeleton" style={{ height: '50px', width: '100%', borderRadius: 'var(--radius-sm)' }} />
+            <div className="skeleton" style={{ height: '50px', width: '100%', borderRadius: 'var(--radius-sm)' }} />
+          </div>
+        ) : rights.length > 0 ? (
+          rights.map((r, i) => (
+            <div key={i} style={{ padding: '16px 0 16px 16px', borderLeft: '4px solid var(--warning)', marginBottom: i < rights.length - 1 ? '16px' : 0, background: 'var(--warning-bg)', borderRadius: '0 var(--radius-sm) var(--radius-sm) 0' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-primary)', marginBottom: '4px' }}>{r.right}</div>
+              <div className="text-sm text-secondary">{r.how}</div>
             </div>
-          ) : loading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="skeleton" style={{ height: '50px', width: '100%', borderRadius: 'var(--radius-sm)' }} />
-              <div className="skeleton" style={{ height: '50px', width: '100%', borderRadius: 'var(--radius-sm)' }} />
-            </div>
-          ) : rights.length > 0 ? (
-            rights.map((r, i) => (
-              <div key={i} style={{ padding: '16px 0 16px 16px', borderLeft: '4px solid var(--warning)', marginBottom: i < rights.length - 1 ? '16px' : 0, background: 'var(--warning-bg)', borderRadius: '0 var(--radius-sm) var(--radius-sm) 0' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-primary)', marginBottom: '4px' }}>{r.right}</div>
-                <div className="text-sm text-secondary">{r.how}</div>
-              </div>
-            ))
-          ) : null}
-        </div>
+          ))
+        ) : null}
       </div>
-    </section>
+    </div>
   )
 }
 
 function RecallAssistantSection() {
-  const { user, getLatestEncounter, updateEncounter } = useGabAiStore()
+  const { user, getLatestEncounter, updateEncounter, getAllEncounters } = useGabAiStore()
   const [recallInput, setRecallInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [recallResult, setRecallResult] = useState<RecallResult | null>(null)
@@ -333,6 +326,7 @@ function RecallAssistantSection() {
           mimeType: audioMimeType,
           script: currentEncounter?.script ?? '',
           language: user?.language ?? 'taglish',
+          history: getAllEncounters().filter(e => e.id !== currentEncounter?.id).slice(-3) // context
         }),
       })
 
@@ -376,16 +370,13 @@ function RecallAssistantSection() {
   if (!mounted) return null
 
   return (
-    <section id="recall" className="feature-anchor">
-      <div className="section-eyebrow" style={{ color: 'var(--primary)', marginBottom: '8px' }}>2. PATIENT RECALL ASSISTANT</div>
-      <h2 className="text-h2" style={{ marginBottom: '8px' }}>Ano ang Narinig Mo?</h2>
-      <p className="text-body text-secondary" style={{ maxWidth: '600px', marginBottom: '12px' }}>
-        Isulat ang iyong narinig mula sa doktor — kahit hindi kumpleto, mali ang spelling, o Taglish. Itatama at ipapaliwanag ng GabAi para sa iyo.
-      </p>
-      <LegalNotice
-        text="Para sa iyong privacy at ayon sa RA 4200, huwag i-record ang konsultasyon nang walang pahintulot. Gamitin ang Voice Input para i-record ang iyong sariling salita lamang."
-        variant="info"
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+      <div style={{ width: '100%', maxWidth: '700px' }}>
+        <LegalNotice
+          text="Para sa iyong privacy at ayon sa RA 4200, huwag i-record ang konsultasyon nang walang pahintulot. Gamitin ang Voice Input para i-record ang iyong sariling salita lamang."
+          variant="info"
+        />
+      </div>
 
       <div className="card" style={{ marginTop: '24px', maxWidth: '700px', border: showEmptyError ? '1px solid var(--danger)' : '1px solid var(--border)' }}>
         <div className="card-body">
@@ -393,6 +384,11 @@ function RecallAssistantSection() {
             {currentEncounter?.script && (
               <span className="badge badge-success" style={{ padding: '4px 10px', fontSize: '11px' }}>
                 May script mula sa Before Phase
+              </span>
+            )}
+            {getAllEncounters().length > 1 && (
+              <span className="badge badge-warning" style={{ padding: '4px 10px', fontSize: '11px' }}>
+                Follow-up: May Alaala mula sa mga nakaraang visit
               </span>
             )}
             <span className="badge" style={{ padding: '4px 10px', fontSize: '11px', background: 'var(--bg-muted)', color: 'var(--text-muted)' }}>
@@ -539,6 +535,8 @@ function RecallAssistantSection() {
       {recallResult && (
         <div style={{
           marginTop: '24px',
+          width: '100%',
+          maxWidth: '700px',
           animation: 'fadeUp 0.3s ease-out forwards',
           opacity: 0,
           transform: 'translateY(8px)'
@@ -638,7 +636,7 @@ function RecallAssistantSection() {
           </div>
         </div>
       )}
-    </section>
+    </div>
   )
 }
 
@@ -686,11 +684,8 @@ function DocumentScannerSection() {
   }
 
   return (
-    <section id="scanner" className="feature-anchor">
-      <div className="section-eyebrow" style={{ color: 'var(--success)', marginBottom: '8px' }}>3. I-analyze ang Lab Results</div>
-      <h2 className="text-h2" style={{ marginBottom: '20px' }}>I-scan ang Lab Report o Dokumento</h2>
-      <div className="card" style={{ borderTop: '4px solid var(--success)' }}>
-        <div className="card-body">
+    <div className="card" style={{ borderTop: '4px solid var(--success)' }}>
+      <div className="card-body">
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => processFile(e.target.files?.[0])} />
           <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => processFile(e.target.files?.[0])} />
 
@@ -733,9 +728,8 @@ function DocumentScannerSection() {
               </div>
             </div>
           )}
-        </div>
       </div>
-    </section>
+    </div>
   )
 }
 
@@ -753,10 +747,10 @@ function TaposNaCard() {
   }
 
   return (
-    <section style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+    <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
       <div style={{ background: 'var(--primary)', padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '12px' }}>
-        <h2 className="text-h2" style={{ color: '#fff', marginBottom: '4px' }}>Tapos na ang iyong konsultasyon?</h2>
-        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.8)', maxWidth: '360px' }}>I-save ang iyong encounter at pumunta sa After Phase.</p>
+        <h2 className="text-h2" style={{ color: '#fff', marginBottom: '4px' }}>I-save ang iyong encounter</h2>
+        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.8)', maxWidth: '360px' }}>At dumiretso sa After Phase.</p>
         <button
           className="btn btn-lg"
           onClick={handleTaposNa}
@@ -766,27 +760,114 @@ function TaposNaCard() {
           {loading ? 'Sine-save...' : 'Pumunta sa After Phase →'}
         </button>
       </div>
-    </section>
+    </div>
   )
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DuringPage() {
-  return (
-    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '48px' }}>
-      <header>
-        <div className="section-eyebrow" style={{ marginBottom: '8px' }}>Phase 2 · Nandito Ka Na</div>
-        <h1 className="text-h1" style={{ marginBottom: '16px' }}>Encounter Support</h1>
-        <p className="text-body text-secondary">
-          Gamitin ang mga kasangkapan sa ibaba habang naghihintay o nakikipag-usap sa iyong doktor — para malaman ang iyong mga karapatan, itala ang narinig, at maintindihan ang lab reports.
-        </p>
-      </header>
+  const [completedStep1, setCompletedStep1] = useState(false)
+  const [completedStep2, setCompletedStep2] = useState(false)
+  const [completedStep3, setCompletedStep3] = useState(false)
+  
+  const step1Ref = useRef<HTMLElement>(null)
+  const step2Ref = useRef<HTMLElement>(null)
+  const step3Ref = useRef<HTMLElement>(null)
+  const step4Ref = useRef<HTMLElement>(null)
 
-      <PatientRightsSection />
-      <RecallAssistantSection />
-      <DocumentScannerSection />
-      <TaposNaCard />
+  return (
+    <div className="bfr">
+      <section className="phase-sec" ref={step1Ref}>
+        <div className="phase-num-col">
+          <div className="phase-circ active">1</div>
+          <div className="phase-line filled" />
+        </div>
+        <div className="phase-main">
+          <span className="phase-tag">Patient Rights</span>
+          <h1 className="phase-h1">Karapatan Mo</h1>
+          <p className="phase-p">Ayon sa iyong sitwasyon at pasilidad na pupuntahan, ito ang mga karapatan mo bilang pasyente:</p>
+          <div className="phase-main-scrollable" style={{ paddingBottom: '100px' }}>
+            <PatientRightsSection />
+            
+            <button className="phase-pri-btn" style={{ marginTop: '24px' }} onClick={() => { setCompletedStep1(true); setTimeout(() => step2Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
+              Ipagpatuloy <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className={`phase-sec ${completedStep1 ? '' : 'locked'}`} ref={step2Ref}>
+        <div className="phase-num-col">
+          <div className={`phase-circ ${completedStep1 ? 'active' : ''}`}>2</div>
+          <div className={`phase-line ${completedStep2 ? 'filled' : ''}`} />
+        </div>
+        <div className="phase-main">
+          <span className="phase-tag">Recall Assistant</span>
+          <h1 className="phase-h1">Ano ang Narinig Mo?</h1>
+          <p className="phase-p">Isulat ang iyong narinig mula sa doktor — kahit hindi kumpleto, mali ang spelling, o Taglish. Itatama at ipapaliwanag ng GabAi para sa iyo.</p>
+          <div className="phase-main-scrollable" style={{ paddingBottom: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <RecallAssistantSection />
+
+            <button className="phase-pri-btn" style={{ marginTop: '24px', alignSelf: 'center' }} onClick={() => { setCompletedStep2(true); setTimeout(() => step3Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
+              Susunod: Lab Reports <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className={`phase-sec ${completedStep2 ? '' : 'locked'}`} ref={step3Ref}>
+        <div className="phase-num-col">
+          <div className={`phase-circ ${completedStep2 ? 'active' : ''}`}>3</div>
+          <div className={`phase-line ${completedStep3 ? 'filled' : ''}`} />
+        </div>
+        <div className="phase-main">
+          <span className="phase-tag">Lab & Documents</span>
+          <h1 className="phase-h1">I-scan ang Lab Report</h1>
+          <p className="phase-p">I-scan ang lab reports o results. Tutulungan ka ni GabAi sa pag-intindi ng iba pang dokumento.</p>
+          <div className="phase-main-scrollable" style={{ paddingBottom: '100px' }}>
+            <DocumentScannerSection />
+
+            <button className="phase-pri-btn" style={{ marginTop: '24px' }} onClick={() => { setCompletedStep3(true); setTimeout(() => step4Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
+              Susunod: Tapusin <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className={`phase-sec ${completedStep3 ? '' : 'locked'}`} ref={step4Ref}>
+        <div className="phase-num-col">
+          <div className={`phase-circ ${completedStep3 ? 'active' : ''}`}>4</div>
+        </div>
+        <div className="phase-main">
+          <span className="phase-tag">Done</span>
+          <h1 className="phase-h1">Tapos na?</h1>
+          <p className="phase-p">Pumunta sa next phase para sa follow-ups at survey.</p>
+          <div className="phase-main-scrollable">
+            <TaposNaCard />
+          </div>
+        </div>
+      </section>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .bfr{margin:-48px}
+        .phase-sec{height:100vh;display:flex;padding:40px 48px;gap:24px;box-sizing:border-box;transition:opacity .4s,filter .4s;overflow:hidden}
+        .phase-sec.locked{opacity:.15;pointer-events:none;filter:blur(3px)}
+        .phase-num-col{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:44px;padding-top:2px}
+        .phase-circ{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;border:2px solid var(--border);color:var(--text-muted);background:#fff;transition:all .35s;flex-shrink:0}
+        .phase-circ.active{background:var(--text-primary);border-color:var(--text-primary);color:#fff}
+        .phase-circ.done{background:var(--primary);border-color:var(--primary);color:#fff}
+        .phase-line{flex:1;width:2px;background:var(--border-light);margin-top:10px;transition:background .4s}
+        .phase-line.filled{background:var(--primary)}
+        .phase-main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+        .phase-tag{display:inline-flex;align-items:center;gap:6px;font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--primary);background:var(--primary-light);padding:5px 14px;border-radius:20px;width:fit-content;margin-bottom:14px}
+        .phase-h1{font-family:'Inter',-apple-system,sans-serif;font-size:2.5rem;font-weight:800;color:var(--text-primary);margin:0 0 10px;line-height:1.1;letter-spacing:-.03em}
+        .phase-p{font-size:.9375rem;color:var(--text-secondary);line-height:1.6;margin:0 0 28px;max-width:560px}
+        .phase-main-scrollable{flex:1;overflow-y:auto;padding-right:8px;padding-bottom:40px}
+        .phase-pri-btn{display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:#fff;border:none;border-radius:40px;padding:9px 18px;font-weight:700;font-size:.6875rem;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
+        .phase-pri-btn:hover{background:var(--primary-hover)}.phase-pri-btn:disabled{opacity:.35;cursor:not-allowed}
+      ` }} />
     </div>
   )
 }
+
