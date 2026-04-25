@@ -7,11 +7,47 @@ export interface DocumentScan {
   scannedAt: string
 }
 
+<<<<<<< HEAD
+=======
+export interface CommuteLeg {
+  mode: string
+  instruction: string
+  fare: number
+}
+
+export interface CommutePlan {
+  totalTime: string
+  totalFare: number
+  legs: CommuteLeg[]
+}
+
+>>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
 export interface Encounter {
   id: string
   createdAt: string
   updatedAt: string
+<<<<<<< HEAD
   symptoms: string
+=======
+  
+  // Phase 1: Before
+  needType?: 'diagnosis' | 'service'
+  symptoms: string // used as query
+  classification?: {
+    title: string
+    class: string
+    risk: 'none' | 'moderate' | 'high'
+  }
+  userLocation?: {
+    lat: number
+    lng: number
+    address?: string
+  }
+  selectedFacility?: any | null // Using any for now to avoid circular import, will refine if needed
+  commutePlan?: CommutePlan | null
+  checklist?: Record<string, boolean>
+
+>>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
   carePlan: {
     facilityLevel: string
     recommendedFacility: string
@@ -87,7 +123,17 @@ export const useGabAiStore = create<GabAiStore>()(
           id,
           createdAt: now,
           updatedAt: now,
+<<<<<<< HEAD
           symptoms: '',
+=======
+          needType: undefined,
+          symptoms: '',
+          classification: undefined,
+          userLocation: undefined,
+          selectedFacility: null,
+          commutePlan: null,
+          checklist: {},
+>>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
           carePlan: null,
           script: '',
           encounterLog: [],
