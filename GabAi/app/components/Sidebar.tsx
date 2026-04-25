@@ -15,11 +15,6 @@ const subLinks: Record<string, { name: string; href: string }[]> = {
     { name: "Voice Logger", href: "/navigator/during#voice" },
     { name: "Document Scanner", href: "/navigator/during#scanner" },
   ],
-  "/navigator/after": [
-    { name: "WhatsApp Share", href: "/navigator/after#share" },
-    { name: "Follow-up Check", href: "/navigator/after#followup" },
-    { name: "Community Log", href: "/navigator/after#experience" },
-  ],
 };
 
 export default function Sidebar() {
@@ -112,30 +107,28 @@ export default function Sidebar() {
       <nav
         ref={navRef}
         className={`relative flex items-center transition-all duration-700 w-full justify-between ${scrolled
-          ? (pathname === '/navigator/before'
+          ? (pathname === '/navigator/before' || pathname === '/navigator/after'
             ? 'bg-[#f2ecdc]/60 backdrop-blur-xl border-none shadow-lg'
             : 'bg-[#f2ecdc]/80 backdrop-blur-xl border border-[#510400]/20 shadow-2xl') + ' rounded-full px-10 py-4 max-w-5xl gap-8'
           : (pathname === '/navigator/before'
             ? 'border-none'
-            : 'backdrop-blur-sm border-b border-[rgba(81,4,0,0.06)]') + ` px-10 py-8 w-full ${pathname === '/' ? 'max-w-full' : 'max-w-7xl'} gap-12`
+            : 'border-none') + ` px-10 py-8 w-full ${pathname === '/' ? 'max-w-full' : 'max-w-7xl'} gap-12`
           }`}
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           ...(!scrolled && {
-            background: pathname === '/navigator/before'
-              ? 'transparent'
-              : 'linear-gradient(to bottom, rgba(242,236,220,0.28) 0%, rgba(242,236,220,0) 100%)'
+            background: 'transparent'
           })
         }}
       >
         {/* Elongated Blur Extension for Landing Page */}
         {!scrolled && pathname === '/' && (
           <div 
-            className="absolute top-0 left-0 right-0 h-[240px] -z-10 backdrop-blur-md"
+            className="absolute top-0 left-0 right-0 h-[240px] -z-10"
             style={{
-              background: 'linear-gradient(to bottom, rgba(242,236,220,0.4) 0%, rgba(242,236,220,0.2) 40%, rgba(242,236,220,0) 100%)',
+              background: 'transparent',
               maskImage: 'linear-gradient(to bottom, black 0%, black 60%, transparent 100%)',
               WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 60%, transparent 100%)'
             }}
