@@ -79,7 +79,7 @@ function PatientRightsSection() {
     }
 
     fetchRights()
-  }, [encounter?.id, encounter?.symptoms, encounter?.carePlan?.facilityLevel, user?.philHealth, user?.language, encounter?.patientRights, updateEncounter])
+  }, [encounter?.id, encounter?.symptoms, encounter?.carePlan?.facilityLevel, user?.philHealth, user?.language, updateEncounter])
 
   if (!mounted) return null
 
