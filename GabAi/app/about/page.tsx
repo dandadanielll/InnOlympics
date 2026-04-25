@@ -2,14 +2,14 @@ export default function AboutPage() {
   return (
     <div style={{ maxWidth: 'var(--content-max)', margin: '0 auto' }}>
       <div className="section-eyebrow" style={{ marginBottom: '8px' }}>Project Background</div>
-      <h1 className="text-h1" style={{ marginBottom: '32px' }}>Gabay + AI = GabAi</h1>
+      <h1 className="text-h1" style={{ marginBottom: '32px' }}>Gabay + AI = GabAI</h1>
 
       <div className="card" style={{ marginBottom: '48px' }}>
         <div className="card-body">
           <h2 className="text-h2" style={{ marginBottom: '16px' }}>The Mission</h2>
           <p className="text-body text-secondary" style={{ lineHeight: 1.8 }}>
             No Filipino should lose a day's wages because the system did not give them a map. 
-            Philippine public healthcare is not absent — it is a maze. Five or more entry points, no routing logic for patients, no document guide, no shared memory between visits. Every encounter starts from zero. GabAi is that map, guided by Gemini AI.
+            Philippine public healthcare is not absent — it is a maze. Five or more entry points, no routing logic for patients, no document guide, no shared memory between visits. Every encounter starts from zero. GabAI is that map, guided by Gemini AI.
           </p>
         </div>
       </div>

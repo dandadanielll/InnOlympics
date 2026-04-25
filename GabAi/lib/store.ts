@@ -68,6 +68,11 @@ export interface Encounter {
     turnedAway: boolean
     rating: number
   }
+  stepState: {
+    before: Record<string, boolean>
+    during: Record<string, boolean>
+    after: Record<string, boolean>
+  }
 }
 
 export interface UserProfile {
@@ -133,6 +138,11 @@ export const useGabAiStore = create<GabAiStore>()(
           facilityId: '',
           referralTriggered: false,
           followUpStatus: 'pending',
+          stepState: {
+            before: {},
+            during: {},
+            after: {},
+          }
         }
         set((state) => ({
           encounters: [...state.encounters, encounter],

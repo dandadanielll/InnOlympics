@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'GabAi — Health Navigation Guide',
+  title: 'GabAI — Health Navigation Guide',
   description: 'Navigate the Philippine healthcare system with confidence. Guided by AI.',
 }
 

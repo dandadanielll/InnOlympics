@@ -674,7 +674,7 @@ const geminiConfig = {
 --bg-dark: #2a2f18;            /* Dark forest — footer, nav dark mode */
 
 /* 30% — Primary Accent */
---primary: #7e2625;            /* Deep red — hero elements, primary CTAs, critical alerts */
+--primary: #510400;            /* Deep red — hero elements, primary CTAs, critical alerts */
 --primary-hover: #6a1f1e;      /* Darker red on hover */
 
 /* 10% — Secondary Accents */
@@ -866,7 +866,7 @@ const geminiConfig = {
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f2ecdc",
-  "theme_color": "#7e2625",
+  "theme_color": "#510400",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
