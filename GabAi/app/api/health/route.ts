@@ -27,7 +27,7 @@ export async function GET() {
 
       if (data.error) {
         const code = data.error.code
-        // Quota exhausted — try next model
+        // Quota exhausted - try next model
         if (code === 429) {
           console.warn(`[HealthCheck] ${model} quota exhausted, trying next...`)
           continue
@@ -46,7 +46,7 @@ export async function GET() {
     }
   }
 
-  // All models quota-exhausted — return 200 so it doesn't break the app warmup
+  // All models quota-exhausted - return 200 so it doesn't break the app warmup
   console.warn('[HealthCheck] All models quota exhausted, returning degraded status (app still runs)')
   return NextResponse.json({ status: 'degraded', message: 'All Gemini models quota-exhausted. App runs on static fallback.' }, { status: 200 })
 }
