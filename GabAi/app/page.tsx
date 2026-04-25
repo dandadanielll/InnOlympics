@@ -1,6 +1,7 @@
 'use client'
 import { useEffect } from 'react'
 import Link from 'next/link'
+import LogoLoop from './components/LogoLoop'
 
 export default function LandingPage() {
   useEffect(() => {
@@ -8,20 +9,29 @@ export default function LandingPage() {
     return () => { document.body.style.overflow = '' }
   }, [])
 
+  const partnerLogos = [
+    { src: "/logo1.png", alt: "Partner Logo 1" },
+    { src: "/logo2.png", alt: "Partner Logo 2" },
+    { src: "/logo3.png", alt: "Partner Logo 3" },
+    { src: "/logo4.png", alt: "Partner Logo 4" },
+    { src: "/logo5.png", alt: "Partner Logo 5" },
+    { src: "/logo6.png", alt: "Partner Logo 6" },
+  ];
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
 
       {/* HERO — full-viewport arc background */}
       <section style={{
         position: 'relative',
-        minHeight: '100vh',
+        height: '100vh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         textAlign: 'center',
         margin: '-120px -48px 0',
-        padding: '160px 48px 120px',
+        padding: '160px 48px 0', // Reduced bottom padding to fit logo loop
       }}>
 
         {/* Background photo — fixed to truly cover 100% viewport */}
@@ -51,15 +61,22 @@ export default function LandingPage() {
           `,
           zIndex: -1,
         }} />
+
         {/* Content */}
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: '900px', margin: '40px auto 0' }}>
+        <div style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: '900px',
+          margin: '0 auto',
+          transform: 'translateY(-40px)'
+        }}>
           <h1 className="text-display" style={{ marginBottom: '32px', fontSize: '6rem', lineHeight: '1.05' }}>
-            <div style={{ 
-              animation: 'slideInLeft 1s cubic-bezier(0.16, 1, 0.3, 1) forwards' 
+            <div style={{
+              animation: 'slideInLeft 1s cubic-bezier(0.16, 1, 0.3, 1) forwards'
             }}>
               Abot-kamay na
             </div>
-            <div style={{ 
+            <div style={{
               color: 'var(--warning)',
               animation: 'slideInRight 1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both'
             }}>
@@ -67,11 +84,9 @@ export default function LandingPage() {
             </div>
           </h1>
 
-
-
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
             gap: '16px',
             marginTop: '48px',
             animation: 'fadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s both'
@@ -85,6 +100,28 @@ export default function LandingPage() {
               </button>
             </Link>
           </div>
+        </div>
+
+        {/* Logo Loop at the bottom */}
+        <div style={{
+          position: 'absolute',
+          bottom: '8px',
+          width: '100%',
+          left: 0,
+          animation: 'fadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) 1s both',
+          opacity: 0.6,
+          color: 'var(--primary)'
+        }}>
+          <LogoLoop
+            logos={partnerLogos}
+            speed={60}
+            direction="left"
+            logoHeight={32}
+            gap={60}
+            fadeOut
+            fadeOutColor="#f2ecdc"
+            ariaLabel="Health features"
+          />
         </div>
       </section>
 
