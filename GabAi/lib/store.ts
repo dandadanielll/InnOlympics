@@ -7,8 +7,6 @@ export interface DocumentScan {
   scannedAt: string
 }
 
-<<<<<<< HEAD
-=======
 export interface CommuteLeg {
   mode: string
   instruction: string
@@ -21,14 +19,10 @@ export interface CommutePlan {
   legs: CommuteLeg[]
 }
 
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
 export interface Encounter {
   id: string
   createdAt: string
   updatedAt: string
-<<<<<<< HEAD
-  symptoms: string
-=======
   
   // Phase 1: Before
   needType?: 'diagnosis' | 'service'
@@ -47,7 +41,6 @@ export interface Encounter {
   commutePlan?: CommutePlan | null
   checklist?: Record<string, boolean>
 
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
   carePlan: {
     facilityLevel: string
     recommendedFacility: string
@@ -74,6 +67,11 @@ export interface Encounter {
     doctorHelpful: boolean
     turnedAway: boolean
     rating: number
+  }
+  stepState: {
+    before: Record<string, boolean>
+    during: Record<string, boolean>
+    after: Record<string, boolean>
   }
 }
 
@@ -123,9 +121,6 @@ export const useGabAiStore = create<GabAiStore>()(
           id,
           createdAt: now,
           updatedAt: now,
-<<<<<<< HEAD
-          symptoms: '',
-=======
           needType: undefined,
           symptoms: '',
           classification: undefined,
@@ -133,7 +128,6 @@ export const useGabAiStore = create<GabAiStore>()(
           selectedFacility: null,
           commutePlan: null,
           checklist: {},
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
           carePlan: null,
           script: '',
           encounterLog: [],
@@ -144,6 +138,11 @@ export const useGabAiStore = create<GabAiStore>()(
           facilityId: '',
           referralTriggered: false,
           followUpStatus: 'pending',
+          stepState: {
+            before: {},
+            during: {},
+            after: {},
+          }
         }
         set((state) => ({
           encounters: [...state.encounters, encounter],

@@ -11,22 +11,73 @@ interface CommunityFormState {
   rating: number
 }
 
+const WHATSAPP_TEXT = `GabAi Visit Summary: I've completed my hospital visit. Here are the details...\n\nStatus: Recovering\nFacility: PGH\nNext Steps: Follow-up in 2 days.`
+
 export default function AfterPage() {
   const router = useRouter()
-  const { getLatestEncounter, updateEncounter, createEncounter, getAllEncounters, user } = useGabAiStore()
-  const encounter = getLatestEncounter()
+  const { currentEncounterId, getLatestEncounter, updateEncounter, createEncounter, getAllEncounters, user, getCurrentEncounter } = useGabAiStore()
+  const encounter = getCurrentEncounter() || getLatestEncounter()
 
   const [followUp, setFollowUp] = useState<'improving' | 'same' | 'worse' | null>(null)
   const [logDone, setLogDone] = useState(false)
   const [shared, setShared] = useState(false)
+
+  // Stepper states
+  const [completedStep2, setCompletedStep2] = useState(false)
+  const [completedStep3, setCompletedStep3] = useState(false)
+  const [completedStep4, setCompletedStep4] = useState(false)
+
+  // ── JOURNEY PERSISTENCE ──
+  useEffect(() => {
+    const enc = getCurrentEncounter() || getLatestEncounter()
+    if (enc && enc.stepState?.after) {
+      const as = enc.stepState.after
+      if (as.step2) setCompletedStep2(true)
+      if (as.step3) setCompletedStep3(true)
+      if (as.step4) setCompletedStep4(true)
+      if (as.shared) setShared(true)
+      if (as.logDone) setLogDone(true)
+    }
+  }, [currentEncounterId])
+
+  // Save steps to store when they change
+  useEffect(() => {
+    const id = currentEncounterId || getLatestEncounter()?.id
+    if (id) {
+      const enc = getCurrentEncounter() || getLatestEncounter()
+      if (enc) {
+        updateEncounter(id, {
+          stepState: {
+            ...enc.stepState,
+            after: {
+              step2: completedStep2,
+              step3: completedStep3,
+              step4: completedStep4,
+              shared: shared,
+              logDone: logDone
+            }
+          }
+        })
+      }
+    }
+  }, [completedStep2, completedStep3, completedStep4, shared, logDone])
+
+  // Refs for scrolling
+  const step3Ref = useRef<HTMLDivElement>(null)
+  const step4Ref = useRef<HTMLDivElement>(null)
+  const step5Ref = useRef<HTMLDivElement>(null)
 
   const handleShare = () => {
     window.open(`https://wa.me/?text=${encodeURIComponent(WHATSAPP_TEXT)}`, '_blank')
     setShared(true)
   }
 
+  const handleStartNew = (isReferral: boolean) => {
+    router.push('/navigator/before')
+  }
+
   return (
-    <div style={{ maxWidth: 'var(--content-max)', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '48px' }}>
+    <div style={{ maxWidth: 'var(--content-max)', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '48px', padding: '40px 20px' }}>
 
       {/* 0. OVERVIEW */}
       <div>
@@ -52,7 +103,7 @@ export default function AfterPage() {
             {!shared ? (
               <button className="btn btn-primary" style={{ background: '#25d366', width: '100%' }} onClick={handleShare}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" />
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" x2="12" y2="15" />
                 </svg>
                 Send via WhatsApp
               </button>
@@ -118,7 +169,7 @@ export default function AfterPage() {
       <div className="divider" style={{ margin: 0 }} />
 
       {/* 2. FOLLOW-UP CHECK */}
-      <div id="followup" className="feature-anchor">
+      <div id="followup" className="feature-anchor" ref={step3Ref}>
         <div className="section-eyebrow" style={{ color: 'var(--primary)', marginBottom: '8px' }}>2. Recovery Tracking</div>
         <h2 className="text-h2" style={{ marginBottom: '24px' }}>24-48 Hour Check-in</h2>
 
@@ -142,7 +193,7 @@ export default function AfterPage() {
                   <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: followUp === opt.val ? opt.color : 'transparent', border: `2px solid ${opt.color}` }} />
                   <span className="text-sm" style={{ fontWeight: 600 }}>{opt.label}</span>
                 </div>
-              ) : null}
+              ))}
             </div>
 
             <button className="phase-pri-btn" style={{ marginTop: '24px', alignSelf: 'center' }} onClick={() => { setCompletedStep3(true); setTimeout(() => step4Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
@@ -155,7 +206,7 @@ export default function AfterPage() {
       <div className="divider" style={{ margin: 0 }} />
 
       {/* 3. COMMUNITY LOG */}
-      <div id="experience" className="feature-anchor">
+      <div id="experience" className="feature-anchor" ref={step4Ref}>
         <div className="section-eyebrow" style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>3. Future Patients</div>
         <h2 className="text-h2" style={{ marginBottom: '24px' }}>Community Experience Log</h2>
 
@@ -191,12 +242,9 @@ export default function AfterPage() {
           Ipagpatuloy <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
         </button>
       </div>
-    </div>
-      </section >
 
-    {/* STEP 5: ALAALA KO (DONE) */ }
-    < section className = {`phase-sec ${completedStep4 ? '' : 'locked'}`
-} ref = { step5Ref } >
+      {/* STEP 5: ALAALA KO (DONE) */}
+      <section className={`phase-sec ${completedStep4 ? '' : 'locked'}`} ref={step5Ref}>
         <div className="phase-num-col">
           <div className={`phase-circ ${completedStep4 ? 'active' : ''}`}>5</div>
         </div>
@@ -222,8 +270,8 @@ export default function AfterPage() {
             </div>
           </div>
         </div>
-      </section >
+      </section>
 
-    </div >
+    </div>
   )
 }

@@ -28,14 +28,8 @@ interface PatientRight {
 // ─── Sub-Components ──────────────────────────────────────────────────────────
 
 function PatientRightsSection() {
-<<<<<<< HEAD
-  const { user, getLatestEncounter, updateEncounter, getAllEncounters } = useGabAiStore()
-  const rawEncounter = getLatestEncounter()
-  const encounter = rawEncounter?.phase === 'complete' || rawEncounter?.phase === 'after' ? null : rawEncounter
-=======
   const { user, getCurrentEncounter, getLatestEncounter, updateEncounter, getAllEncounters } = useGabAiStore()
   const encounter = getCurrentEncounter() || getLatestEncounter()
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
 
   const [rights, setRights] = useState<PatientRight[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,8 +50,6 @@ function PatientRightsSection() {
 
     const fetchRights = async () => {
       try {
-<<<<<<< HEAD
-=======
         // Derive facility level from tags if not explicitly in carePlan
         let facilityLevel = encounter.carePlan?.facilityLevel || ''
         if (!facilityLevel && encounter.selectedFacility?.tags) {
@@ -76,17 +68,12 @@ function PatientRightsSection() {
           else facilityLevel = 'Primary'
         }
 
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
         const res = await fetch('/api/gemini/rights', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             symptoms: encounter.symptoms,
-<<<<<<< HEAD
-            facilityLevel: encounter.carePlan?.facilityLevel || '',
-=======
             facilityLevel,
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
             philHealth: user?.philHealth || 'not-sure',
             language: user?.language || 'taglish',
             history: getAllEncounters().filter(e => e.id !== encounter.id).slice(-3) // last 3 past encounters
@@ -147,11 +134,7 @@ function PatientRightsSection() {
 }
 
 function RecallAssistantSection() {
-<<<<<<< HEAD
-  const { user, getLatestEncounter, updateEncounter, getAllEncounters } = useGabAiStore()
-=======
   const { user, getCurrentEncounter, getLatestEncounter, updateEncounter, getAllEncounters } = useGabAiStore()
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
   const [recallInput, setRecallInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [recallResult, setRecallResult] = useState<RecallResult | null>(null)
@@ -174,12 +157,7 @@ function RecallAssistantSection() {
   const [volume, setVolume] = useState(0)
   const visualizerCleanupRef = useRef<(() => void) | null>(null)
 
-<<<<<<< HEAD
-  const rawEncounter = getLatestEncounter()
-  const currentEncounter = rawEncounter?.phase === 'complete' || rawEncounter?.phase === 'after' ? null : rawEncounter
-=======
   const currentEncounter = getCurrentEncounter() || getLatestEncounter()
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
 
   useEffect(() => {
     setMounted(true)
@@ -679,12 +657,8 @@ function RecallAssistantSection() {
 }
 
 function DocumentScannerSection() {
-<<<<<<< HEAD
-  const { getLatestEncounter, updateEncounter } = useGabAiStore()
-=======
   const { getCurrentEncounter, getLatestEncounter, updateEncounter } = useGabAiStore()
   const enc = getCurrentEncounter() || getLatestEncounter()
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
   const [scanned, setScanned] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -701,17 +675,9 @@ function DocumentScannerSection() {
     setTimeout(() => {
       setScanning(false)
       setScanned(true)
-<<<<<<< HEAD
-      const rawEnc = getLatestEncounter()
-      const enc = rawEnc?.phase === 'complete' || rawEnc?.phase === 'after' ? null : rawEnc
-      if (enc) {
-        updateEncounter(enc.id, {
-          documentScans: [...enc.documentScans, { explanation: SCAN_RESULT, scannedAt: new Date().toISOString() }],
-=======
       if (enc) {
         updateEncounter(enc.id, {
           documentScans: [...(enc.documentScans || []), { explanation: SCAN_RESULT, scannedAt: new Date().toISOString() }],
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
         })
       }
     }, 1500)
@@ -735,50 +701,6 @@ function DocumentScannerSection() {
   return (
     <div className="card" style={{ borderTop: '4px solid var(--success)' }}>
       <div className="card-body">
-<<<<<<< HEAD
-        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => processFile(e.target.files?.[0])} />
-        <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => processFile(e.target.files?.[0])} />
-
-        {!scanned && !scanning ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px', textAlign: 'center', border: '2px dashed var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-base)' }}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '16px' }}>
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-              <circle cx="12" cy="13" r="4" />
-            </svg>
-            <h3 className="text-h3" style={{ marginBottom: '8px' }}>I-scan ang Dokumento</h3>
-            <p className="text-sm text-secondary" style={{ maxWidth: '280px', marginBottom: '24px' }}>
-              I-scan ang lab reports o results. Tutulungan ka ni GabAi sa pag-intindi ng iba pang dokumento.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '280px' }}>
-              <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', background: 'var(--success)', border: 'none' }} onClick={() => cameraInputRef.current?.click()}>
-                Kunan ng litrato
-              </button>
-              <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={() => fileInputRef.current?.click()}>
-                Mag-upload ng larawan
-              </button>
-            </div>
-          </div>
-        ) : scanning ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px 0' }}>
-            <div className="section-eyebrow">Sinusuri ng AI...</div>
-            {[90, 70, 80].map((w, i) => (
-              <div key={i} className="skeleton" style={{ height: '14px', width: `${w}%` }} />
-            ))}
-          </div>
-        ) : (
-          <div>
-            {previewUrl && <img src={previewUrl} alt="Na-scan" style={{ maxHeight: '200px', width: '100%', objectFit: 'cover', borderRadius: 'var(--radius-md)', marginBottom: '16px' }} />}
-            <span className="badge badge-success" style={{ marginBottom: '12px', display: 'inline-block' }}>Dokumento Nakilala</span>
-            <p className="text-sm" style={{ lineHeight: 1.8, marginBottom: '20px' }}>{SCAN_RESULT}</p>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <button className="btn btn-ghost btn-sm" onClick={handleReadResult}>
-                {speaking ? 'Binabasa...' : 'Basahin para sa akin'}
-              </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => { setScanned(false); setPreviewUrl(null) }}>I-scan Uli</button>
-            </div>
-          </div>
-        )}
-=======
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => processFile(e.target.files?.[0])} />
           <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => processFile(e.target.files?.[0])} />
 
@@ -821,7 +743,6 @@ function DocumentScannerSection() {
               </div>
             </div>
           )}
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
       </div>
     </div>
   )
@@ -829,21 +750,12 @@ function DocumentScannerSection() {
 
 function TaposNaCard() {
   const router = useRouter()
-<<<<<<< HEAD
-  const { getLatestEncounter, updateEncounter } = useGabAiStore()
-=======
   const { getCurrentEncounter, getLatestEncounter, updateEncounter } = useGabAiStore()
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
   const [loading, setLoading] = useState(false)
 
   const handleTaposNa = () => {
     setLoading(true)
-<<<<<<< HEAD
-    const rawEnc = getLatestEncounter()
-    const enc = rawEnc?.phase === 'complete' || rawEnc?.phase === 'after' ? null : rawEnc
-=======
     const enc = getCurrentEncounter() || getLatestEncounter()
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
     if (enc) updateEncounter(enc.id, { phase: 'complete' })
     router.push('/navigator/after')
   }
@@ -869,14 +781,42 @@ function TaposNaCard() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DuringPage() {
+  const { currentEncounterId, updateEncounter, getCurrentEncounter, getLatestEncounter } = useGabAiStore()
   const [completedStep1, setCompletedStep1] = useState(false)
   const [completedStep2, setCompletedStep2] = useState(false)
   const [completedStep3, setCompletedStep3] = useState(false)
-<<<<<<< HEAD
 
-=======
+  // ── JOURNEY PERSISTENCE ──
+  useEffect(() => {
+    const encounter = getCurrentEncounter() || getLatestEncounter()
+    if (encounter && encounter.stepState?.during) {
+      const ds = encounter.stepState.during
+      if (ds.step1) setCompletedStep1(true)
+      if (ds.step2) setCompletedStep2(true)
+      if (ds.step3) setCompletedStep3(true)
+    }
+  }, [currentEncounterId])
+
+  // Save steps to store when they change
+  useEffect(() => {
+    const id = currentEncounterId || getLatestEncounter()?.id
+    if (id) {
+      const enc = getCurrentEncounter() || getLatestEncounter()
+      if (enc) {
+        updateEncounter(id, {
+          stepState: {
+            ...enc.stepState,
+            during: {
+              step1: completedStep1,
+              step2: completedStep2,
+              step3: completedStep3,
+            }
+          }
+        })
+      }
+    }
+  }, [completedStep1, completedStep2, completedStep3])
   
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
   const step1Ref = useRef<HTMLElement>(null)
   const step2Ref = useRef<HTMLElement>(null)
   const step3Ref = useRef<HTMLElement>(null)
@@ -895,11 +835,7 @@ export default function DuringPage() {
           <p className="phase-p">Ayon sa iyong sitwasyon at pasilidad na pupuntahan, ito ang mga karapatan mo bilang pasyente:</p>
           <div className="phase-main-scrollable" style={{ paddingBottom: '100px' }}>
             <PatientRightsSection />
-<<<<<<< HEAD
-
-=======
             
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
             <button className="phase-pri-btn" style={{ marginTop: '24px' }} onClick={() => { setCompletedStep1(true); setTimeout(() => step2Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
               Ipagpatuloy <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
             </button>
@@ -959,12 +895,7 @@ export default function DuringPage() {
         </div>
       </section>
 
-<<<<<<< HEAD
-      <style dangerouslySetInnerHTML={{
-        __html: `
-=======
       <style dangerouslySetInnerHTML={{ __html: `
->>>>>>> e26e6852219b98f6a56bf70aba3b98146879fc4c
         .bfr{margin:-48px}
         .phase-sec{height:100vh;display:flex;padding:40px 48px;gap:24px;box-sizing:border-box;transition:opacity .4s,filter .4s;overflow:hidden}
         .phase-sec.locked{opacity:.15;pointer-events:none;filter:blur(3px)}
@@ -985,4 +916,3 @@ export default function DuringPage() {
     </div>
   )
 }
-
