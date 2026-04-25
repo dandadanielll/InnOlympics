@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useGabAiStore } from '@/lib/store'
 import { LegalNotice } from '../../components/LegalNotice'
@@ -23,6 +23,8 @@ interface RecallResult {
 interface PatientRight {
   right: string
   how: string
+  article?: string
+  application?: string
 }
 
 // ─── Sub-Components ──────────────────────────────────────────────────────────
@@ -59,7 +61,7 @@ function PatientRightsSection() {
           else if (tags.includes('level i')) facilityLevel = 'Primary'
           else if (encounter.selectedFacility.isBHC) facilityLevel = 'BHC'
         }
-        
+
         // Fallback to classification risk
         if (!facilityLevel && encounter.classification?.risk) {
           const risk = encounter.classification.risk.toLowerCase()
@@ -102,33 +104,41 @@ function PatientRightsSection() {
   if (!mounted) return null
 
   return (
-    <div className="card" style={{ borderTop: '4px solid var(--warning)', opacity: (!encounter || !encounter.symptoms) ? 0.6 : 1 }}>
-      <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-        {(!encounter || !encounter.symptoms) ? (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <p className="text-sm text-secondary">Kinakailangan ang <b>Phase 1 (Intake)</b> para makita ang mga karapatang ito.</p>
-            <button
-              className="btn btn-ghost btn-sm"
-              style={{ marginTop: '12px', color: 'var(--warning)' }}
-              onClick={() => window.location.href = '/navigator/before'}
-            >
-              ← Bumalik sa Phase 1
-            </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {(!encounter || !encounter.symptoms) ? (
+        <div style={{ textAlign: 'center', padding: '40px 24px', background: 'rgba(139,90,60,0.05)', borderRadius: '16px', border: '1px dashed rgba(139,90,60,0.2)' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📋</div>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>Kinakailangan ang <b>Phase 1 (Intake)</b> para makita ang mga karapatang ito.</p>
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ color: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: '20px' }}
+            onClick={() => window.location.href = '/navigator/before'}
+          >
+            ← Bumalik sa Before Phase
+          </button>
+        </div>
+      ) : loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} className="skeleton" style={{ height: '90px', width: '100%', borderRadius: '14px' }} />
+          ))}
+        </div>
+      ) : rights.length > 0 ? (
+        rights.map((r, i) => (
+          <div key={i} style={{
+            background: '#fff',
+            borderRadius: '14px',
+            border: '1px solid var(--border-light)',
+            padding: '24px',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', background: '#510400', borderRadius: '4px 0 0 4px' }} />
+            <div style={{ fontWeight: 800, fontSize: '0.9375rem', color: '#510400', marginBottom: '12px' }}>{r.right}</div>
+            <p style={{ fontSize: '0.875rem', color: '#6B4F3A', lineHeight: 1.65, margin: 0 }}>{r.how}</p>
           </div>
-        ) : loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="skeleton" style={{ height: '50px', width: '100%', borderRadius: 'var(--radius-sm)' }} />
-            <div className="skeleton" style={{ height: '50px', width: '100%', borderRadius: 'var(--radius-sm)' }} />
-          </div>
-        ) : rights.length > 0 ? (
-          rights.map((r, i) => (
-            <div key={i} style={{ padding: '16px 0 16px 16px', borderLeft: '4px solid var(--warning)', marginBottom: i < rights.length - 1 ? '16px' : 0, background: 'var(--warning-bg)', borderRadius: '0 var(--radius-sm) var(--radius-sm) 0' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-primary)', marginBottom: '4px' }}>{r.right}</div>
-              <div className="text-sm text-secondary">{r.how}</div>
-            </div>
-          ))
-        ) : null}
-      </div>
+        ))
+      ) : null}
     </div>
   )
 }
@@ -136,6 +146,7 @@ function PatientRightsSection() {
 function RecallAssistantSection() {
   const { user, getCurrentEncounter, getLatestEncounter, updateEncounter, getAllEncounters } = useGabAiStore()
   const [recallInput, setRecallInput] = useState('')
+  const recallInputRef = useRef('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [recallResult, setRecallResult] = useState<RecallResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -162,7 +173,6 @@ function RecallAssistantSection() {
   useEffect(() => {
     setMounted(true)
     if (typeof window !== 'undefined') {
-      // Restore consent from localStorage so user doesn't have to re-accept on every reload
       if (localStorage.getItem('gabai-voice-consent') === 'true') {
         setConsentGiven(true)
       }
@@ -186,26 +196,25 @@ function RecallAssistantSection() {
             }
           }
           if (finalTranscript) {
-            setRecallInput((prev) => prev + finalTranscript)
+            setRecallInput((prev) => {
+              const next = prev + finalTranscript
+              recallInputRef.current = next
+              return next
+            })
           }
           setInterimResult(interimTranscript)
         }
 
         recognitionRef.current.onerror = (event: any) => {
           if (event.error === 'no-speech') return
-          // Do not kill the global isRecording state here, as MediaRecorder might still be working!
           if (event.error === 'not-allowed') {
             setMicError('Hindi pinayagan ang mikropono. I-allow sa browser settings.')
-          } else if (event.error === 'network') {
-            // SpeechRecognition needs internet, but MediaRecorder doesn't.
           }
         }
 
         recognitionRef.current.onend = () => {
           if (isRecordingRef.current) {
-            try {
-              recognitionRef.current.start()
-            } catch (e) { }
+            try { recognitionRef.current.start() } catch (e) { }
           } else {
             setIsRecording(false)
             setInterimResult('')
@@ -217,19 +226,71 @@ function RecallAssistantSection() {
     }
   }, [])
 
+  async function submitDirectly(b64: string | null, mime: string | null, text: string) {
+    if (!text.trim() && !b64) {
+      setShowEmptyError(true)
+      setTimeout(() => setShowEmptyError(false), 3000)
+      return
+    }
+    if (isProcessing) return
+    setIsProcessing(true)
+    setError(null)
+    setRecallResult(null)
+
+    try {
+      const response = await fetch('/api/gemini/recall', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recallInput: text,
+          audioBase64: b64,
+          mimeType: mime,
+          script: currentEncounter?.script ?? '',
+          language: user?.language ?? 'taglish',
+          history: getAllEncounters().filter(e => e.id !== currentEncounter?.id).slice(-3)
+        }),
+      })
+
+      if (!response.ok) throw new Error('Recall processing failed')
+
+      const data = await response.json()
+      const result: RecallResult = {
+        instructions: data.instructions,
+        flagged: data.flagged,
+        rawInput: text,
+        processedAt: new Date().toISOString(),
+      }
+
+      setRecallResult(result)
+
+      if (currentEncounter) {
+        updateEncounter(currentEncounter.id, {
+          toRemember: data.instructions.map((i: RecallInstruction) => i.instruction),
+          encounterLog: [
+            ...currentEncounter.encounterLog,
+            { speaker: 'Patient', text: text },
+          ],
+        })
+      }
+    } catch (err) {
+      console.error(err)
+      setError('Hindi namin naisulat ang iyong input. Paki-try ulit.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   const handleMicClick = () => {
     if (isRecording) {
       isRecordingRef.current = false
       setIsRecording(false)
 
-      // Stop Visualizer
       if (visualizerCleanupRef.current) {
         visualizerCleanupRef.current()
         visualizerCleanupRef.current = null
       }
       setVolume(0)
 
-      // Stop MediaRecorder
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop()
       }
@@ -237,7 +298,6 @@ function RecallAssistantSection() {
         streamRef.current.getTracks().forEach(track => track.stop())
       }
 
-      // Stop SpeechRecognition
       try {
         recognitionRef.current?.stop()
       } catch (e) { }
@@ -252,11 +312,9 @@ function RecallAssistantSection() {
 
   const startRecording = async () => {
     try {
-      // 1. Capture audio stream for MediaRecorder
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      // Initialize Visualizer
       visualizerCleanupRef.current = createAudioVisualizer(stream, setVolume)
 
       const mimeType = getSupportedMimeType()
@@ -265,9 +323,7 @@ function RecallAssistantSection() {
       chunksRef.current = []
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data)
-        }
+        if (event.data.size > 0) chunksRef.current.push(event.data)
       }
 
       mediaRecorder.onstop = async () => {
@@ -276,23 +332,22 @@ function RecallAssistantSection() {
           const base64 = await blobToBase64(audioBlob)
           setAudioBase64(base64)
           setAudioMimeType(mimeType || 'audio/webm')
+
+          await submitDirectly(base64, mimeType || 'audio/webm', recallInputRef.current)
         } catch (e) {
           console.error("Failed to process audio:", e)
         }
       }
 
-      mediaRecorder.start(100) // Capture chunks every 100ms
+      mediaRecorder.start(100)
       setIsRecording(true)
       isRecordingRef.current = true
       setMicError(null)
 
-      // 2. Start SpeechRecognition (for UI visualization only)
       if (recognitionRef.current) {
         try {
           recognitionRef.current.start()
-        } catch (err) {
-          console.error("SpeechRecognition error:", err)
-        }
+        } catch (err) { }
       }
     } catch (err: any) {
       console.error(err)
@@ -320,61 +375,6 @@ function RecallAssistantSection() {
     setExpandedIndices(next)
   }
 
-  async function handleRecallSubmit() {
-    if (!recallInput.trim() && !audioBase64) {
-      setShowEmptyError(true)
-      setTimeout(() => setShowEmptyError(false), 3000)
-      return
-    }
-    if (isProcessing) return
-
-    setIsProcessing(true)
-    setError(null)
-    setRecallResult(null)
-
-    try {
-      const response = await fetch('/api/gemini/recall', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recallInput,
-          audioBase64,
-          mimeType: audioMimeType,
-          script: currentEncounter?.script ?? '',
-          language: user?.language ?? 'taglish',
-          history: getAllEncounters().filter(e => e.id !== currentEncounter?.id).slice(-3) // context
-        }),
-      })
-
-      if (!response.ok) throw new Error('Recall processing failed')
-
-      const data = await response.json()
-      const result: RecallResult = {
-        instructions: data.instructions,
-        flagged: data.flagged,
-        rawInput: recallInput,
-        processedAt: new Date().toISOString(),
-      }
-
-      setRecallResult(result)
-
-      if (currentEncounter) {
-        updateEncounter(currentEncounter.id, {
-          toRemember: data.instructions.map((i: RecallInstruction) => i.instruction),
-          encounterLog: [
-            ...currentEncounter.encounterLog,
-            { speaker: 'Patient', text: recallInput },
-          ],
-        })
-      }
-    } catch (err) {
-      console.error(err)
-      setError('Hindi namin naisulat ang iyong input. Subukan ulit o i-type ng manu-mano.')
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
   const getBadgeColor = (category: string) => {
     const cat = category.toLowerCase()
     if (cat === 'gamot') return 'var(--success)'
@@ -383,187 +383,130 @@ function RecallAssistantSection() {
     return 'var(--text-muted)'
   }
 
+  const handleRestart = () => {
+    setRecallResult(null)
+    setRecallInput('')
+    recallInputRef.current = ''
+    setAudioBase64(null)
+    setInterimResult('')
+  }
+
   if (!mounted) return null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-      <div style={{ width: '100%', maxWidth: '700px' }}>
-        <LegalNotice
-          text="Para sa iyong privacy at ayon sa RA 4200, huwag i-record ang konsultasyon nang walang pahintulot. Gamitin ang Voice Input para i-record ang iyong sariling salita lamang."
-          variant="info"
-        />
+
+      {/* 1. Legal Notice (Image 2 aesthetics) */}
+      {/* 1. Legal Notice */}
+      <div style={{ width: '100%', maxWidth: '700px', display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '24px' }}>
+        <div style={{ flexShrink: 0, color: '#510400' }}>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+        </div>
+        <div>
+          <h4 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 800, color: '#510400' }}>Data Privacy Act of 2012 (RA 10173)</h4>
+          <p style={{ margin: 0, fontSize: '0.875rem', color: '#6B4F3A', lineHeight: 1.6 }}>Para sa iyong privacy, huwag i-record ang doktor nang walang consent. Gamitin ang mikropono para <b>i-record ang sarili mong boses</b>.</p>
+        </div>
       </div>
 
-      <div className="card" style={{ marginTop: '24px', maxWidth: '700px', border: showEmptyError ? '1px solid var(--danger)' : '1px solid var(--border)' }}>
-        <div className="card-body">
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-            {currentEncounter?.script && (
-              <span className="badge badge-success" style={{ padding: '4px 10px', fontSize: '11px' }}>
-                May script mula sa Before Phase
-              </span>
-            )}
-            {getAllEncounters().length > 1 && (
-              <span className="badge badge-warning" style={{ padding: '4px 10px', fontSize: '11px' }}>
-                Follow-up: May Alaala mula sa mga nakaraang visit
-              </span>
-            )}
-            <span className="badge" style={{ padding: '4px 10px', fontSize: '11px', background: 'var(--bg-muted)', color: 'var(--text-muted)' }}>
-              Text at Sariling Voice Input lamang
-            </span>
-          </div>
+      {micError && (
+        <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginBottom: '12px', fontSize: '13px', color: 'var(--danger)', display: 'flex', gap: '8px', alignItems: 'center', width: '100%', maxWidth: '700px' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+          {micError}
+        </div>
+      )}
 
-          {micError && (
-            <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginBottom: '12px', fontSize: '13px', color: 'var(--danger)', display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-              {micError}
-            </div>
-          )}
-
-          {isRecording && (
-            <div style={{
-              marginTop: '16px',
-              marginBottom: '16px',
-              padding: '24px',
-              background: 'linear-gradient(180deg, rgba(239, 68, 68, 0.05) 0%, rgba(239, 68, 68, 0.15) 100%)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '24px',
-              position: 'relative'
-            }}>
-              {/* Soundwave Visualizer */}
-              <div style={{ display: 'flex', gap: '6px', height: '40px', alignItems: 'center' }}>
-                {[...Array(9)].map((_, i) => {
-                  const maxMultiplier = [0.4, 0.6, 0.8, 1, 1.2, 1, 0.8, 0.6, 0.4][i];
-                  const height = Math.max(4, volume * maxMultiplier);
-                  return (
-                    <div key={i} style={{
-                      width: '8px',
-                      height: `${height}px`,
-                      background: 'var(--danger)',
-                      borderRadius: '10px',
-                      transition: 'height 0.1s ease-out'
-                    }} />
-                  )
-                })}
-              </div>
-
-              <span style={{
-                fontSize: '20px',
-                color: interimResult ? 'var(--text-primary)' : 'var(--danger)',
-                fontWeight: interimResult ? 600 : 500,
-                textAlign: 'center',
-                fontStyle: 'italic',
-                minHeight: '28px'
-              }}>
-                {interimResult || "Nagsasalita..."}
-              </span>
-            </div>
-          )}
-
-          <div style={{ position: 'relative' }}>
-            <textarea
-              className="input"
-              style={{
-                width: '100%',
-                fontSize: '16px',
-                minHeight: '150px',
-                padding: '16px',
-                paddingBottom: '48px',
-                borderColor: showEmptyError ? 'var(--danger)' : isRecording ? 'var(--primary)' : 'var(--border)',
-                outline: isRecording ? '2px solid var(--primary)' : 'none',
-                resize: 'vertical',
-                color: isRecording ? 'var(--text-muted)' : 'var(--text-primary)'
-              }}
-              placeholder="Halimbawa: sabi lagyan ng amox... yung may suspension, tatlong beses daw, wag maginom ng malamig, babalik after isang linggo..."
-              value={recallInput + (interimResult ? (recallInput ? ' ' : '') + interimResult : '')}
-              onChange={(e) => {
-                if (isRecording) return; // Prevent manual typing collisions while recording
-                setRecallInput(e.target.value.slice(0, 1000))
-              }}
-              rows={6}
-            />
-            <button
-              onClick={handleMicClick}
-              className="btn btn-ghost btn-sm"
-              style={{
-                position: 'absolute',
-                bottom: '12px',
-                right: '12px',
-                color: isRecording ? 'var(--danger)' : 'var(--text-secondary)',
-                background: isRecording ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-muted)',
-                borderRadius: 'var(--radius-pill)',
-                padding: '6px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                animation: isRecording ? 'pulse 1.5s infinite' : 'none'
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill={isRecording ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                <line x1="12" y1="19" x2="12" y2="23"></line>
-                <line x1="8" y1="23" x2="16" y2="23"></line>
-              </svg>
-              {isRecording ? 'Nagsasalita...' : 'Gamitin ang boses'}
-            </button>
-          </div>
-          {showEmptyError && <p style={{ color: 'var(--danger)', fontSize: '12px', marginTop: '4px' }}>Isulat muna ang iyong narinig bago iproseso.</p>}
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-            <span className="text-xs text-muted">Kahit hindi kumpleto — gawin mo lang ang best mo.</span>
-            <span className={`text-xs ${recallInput.length > 800 ? 'text-danger' : 'text-muted'}`}>
-              {recallInput.length} / 1000
-            </span>
-          </div>
-
+      {/* 2. Recording Mode (Hidden when results exist) */}
+      {!recallResult && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 0 40px', minHeight: '300px', width: '100%' }}>
+          {/* The Big Red Button */}
           <button
-            className="btn btn-primary"
-            style={{ width: '100%', marginTop: '16px', background: '#008080', border: 'none', opacity: (isRecording || (!recallInput.trim() && !audioBase64)) ? 0.5 : 1 }}
-            disabled={(!recallInput.trim() && !audioBase64) || isProcessing || isRecording}
-            onClick={handleRecallSubmit}
+            onClick={handleMicClick}
+            disabled={isProcessing}
+            style={{
+              width: '120px', height: '120px', borderRadius: '50%',
+              background: isRecording ? 'var(--danger)' : '#fff',
+              border: isRecording ? 'none' : '2px solid var(--danger)',
+              color: isRecording ? '#fff' : 'var(--danger)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              boxShadow: isRecording ? '0 12px 40px rgba(239, 68, 68, 0.4)' : '0 8px 30px rgba(239, 68, 68, 0.08)',
+              cursor: isProcessing ? 'default' : 'pointer',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: isRecording ? 'scale(1.05)' : 'scale(1)',
+              animation: isRecording ? 'bpulse 2s infinite' : 'none',
+              opacity: isProcessing ? 0.5 : 1
+            }}
           >
-            {isRecording ? 'I-stop ang mic bago mag-submit' : isProcessing ? 'Sinusuri...' : 'Ipaliwanag ng GabAi →'}
+            <svg width="48" height="48" viewBox="0 0 24 24" fill={isRecording ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
           </button>
-        </div>
-      </div>
+          <style dangerouslySetInnerHTML={{
+            __html: `
+              @keyframes bpulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { box-shadow: 0 0 0 30px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+            ` }} />
 
-      {isProcessing && (
-        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div className="skeleton" style={{ height: '60px', width: '100%', borderRadius: 'var(--radius-md)' }} />
-          <div className="skeleton" style={{ height: '60px', width: '100%', borderRadius: 'var(--radius-md)' }} />
-          <div className="skeleton" style={{ height: '60px', width: '100%', borderRadius: 'var(--radius-md)' }} />
+          <h3 style={{ marginTop: '40px', fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+            {isProcessing ? 'Sinisuri ang narinig...' : isRecording ? 'I-click ulit upang itigil...' : 'Gamitin ang Boses'}
+          </h3>
+
+          {/* Visualizer when recording */}
+          {isRecording && (
+            <div style={{ display: 'flex', gap: '6px', height: '40px', alignItems: 'center', marginTop: '16px' }}>
+              {[...Array(9)].map((_, i) => {
+                const maxMultiplier = [0.4, 0.6, 0.8, 1, 1.2, 1, 0.8, 0.6, 0.4][i];
+                const height = Math.max(4, volume * maxMultiplier);
+                return <div key={i} style={{ width: '8px', height: `${height}px`, background: 'var(--danger)', borderRadius: '10px', transition: 'height 0.1s ease-out' }} />
+              })}
+            </div>
+          )}
+
+          <p style={{ marginTop: '12px', fontSize: '0.9375rem', color: isRecording ? 'var(--text-primary)' : 'var(--text-secondary)', textAlign: 'center', maxWidth: '480px', fontStyle: isRecording ? 'italic' : 'normal' }}>
+            {isProcessing ? 'Mangyaring maghintay habang pino-process ng GabAi ang iyong audio.' : isRecording ? (interimResult || recallInput || 'Maaari ka nang magsalita...') : 'Pindutin para simulan ang pag-record ng mga tagubilin ng doktor.'}
+          </p>
+
+          {/* In processing state */}
+          {isProcessing && (
+            <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '600px' }}>
+              <div className="skeleton" style={{ height: '60px', width: '100%', borderRadius: 'var(--radius-md)' }} />
+              <div className="skeleton" style={{ height: '60px', width: '100%', borderRadius: 'var(--radius-md)' }} />
+            </div>
+          )}
+
+          {/* Error handling manually triggering resubmit if needed */}
+          {error && (
+            <div style={{ marginTop: '24px', color: 'var(--danger)', fontSize: '14px' }}>
+              {error} <button onClick={() => submitDirectly(audioBase64, audioMimeType, recallInputRef.current)} style={{ textDecoration: 'underline', background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>Gawin ulit</button>
+            </div>
+          )}
         </div>
       )}
 
-      {error && (
-        <div className="card" style={{ marginTop: '24px', borderLeft: '4px solid var(--danger)', background: 'var(--danger-bg)' }}>
-          <div className="card-body">
-            <p className="text-sm">{error}</p>
-            <button className="btn btn-ghost btn-sm" onClick={handleRecallSubmit} style={{ marginTop: '8px' }}>Subukan ulit</button>
-          </div>
-        </div>
-      )}
-
+      {/* 3. Result UI */}
       {recallResult && (
         <div style={{
-          marginTop: '24px',
           width: '100%',
-          maxWidth: '700px',
+          maxWidth: '800px',
           animation: 'fadeUp 0.3s ease-out forwards',
           opacity: 0,
           transform: 'translateY(8px)'
         }}>
           <style>{`@keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }`}</style>
 
-          <div className="card">
-            <div className="card-body" style={{ padding: 0 }}>
-              <div style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 className="text-h3" style={{ margin: 0 }}>Mga Tagubilin ng Doktor Mo</h3>
-                <span className="text-xs text-muted">Na-process: {new Date(recallResult.processedAt).toLocaleTimeString()}</span>
+          <div>
+            <div style={{ padding: 0 }}>
+              <div style={{ padding: '0 0 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(139,90,60,0.2)' }}>
+                <h3 className="text-h3" style={{ margin: 0, color: '#510400' }}>Mga Tagubilin ng Doktor Mo</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="text-xs text-muted">Na-process: {new Date(recallResult.processedAt).toLocaleTimeString()}</span>
+                  <button onClick={handleRestart} className="btn btn-ghost btn-sm" style={{ border: '1px solid var(--border)', borderRadius: '20px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    Restart / Record Again
+                  </button>
+                </div>
               </div>
               <div className="divider" style={{ margin: 0 }} />
 
@@ -618,9 +561,19 @@ function RecallAssistantSection() {
             </div>
           )}
 
-          <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-            <button className="btn btn-ghost" onClick={() => { setRecallResult(null); setRecallInput(recallResult.rawInput) }}>Baguhin ang input</button>
-            <button className="btn btn-primary" onClick={() => alert('Nai-save! Makikita mo ito sa Alaala Ko.')}>Ito na, tama na →</button>
+          <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', gap: '12px', paddingBottom: '40px' }}>
+            <button
+              onClick={() => { setRecallResult(null); setRecallInput(recallResult.rawInput) }}
+              style={{ padding: '12px 24px', background: 'transparent', color: '#510400', fontSize: '0.875rem', fontWeight: 700, borderRadius: '30px', border: '1px solid rgba(81,4,0,0.3)', cursor: 'pointer' }}
+            >
+              Baguhin ang input
+            </button>
+            <button
+              onClick={() => alert('Nai-save! Makikita mo ito sa Alaala Ko.')}
+              style={{ padding: '12px 24px', background: '#510400', color: '#fff', fontSize: '0.875rem', fontWeight: 700, borderRadius: '30px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(81,4,0,0.2)' }}
+            >
+              Ito na, tama na →
+            </button>
           </div>
         </div>
       )}
@@ -699,220 +652,240 @@ function DocumentScannerSection() {
   }
 
   return (
-    <div className="card" style={{ borderTop: '4px solid var(--success)' }}>
-      <div className="card-body">
-          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => processFile(e.target.files?.[0])} />
-          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => processFile(e.target.files?.[0])} />
+    <div style={{ width: '100%', maxWidth: '700px', margin: '0 auto' }}>
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => processFile(e.target.files?.[0])} />
+      <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => processFile(e.target.files?.[0])} />
 
-          {!scanned && !scanning ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px', textAlign: 'center', border: '2px dashed var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-base)' }}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '16px' }}>
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
-              <h3 className="text-h3" style={{ marginBottom: '8px' }}>I-scan ang Dokumento</h3>
-              <p className="text-sm text-secondary" style={{ maxWidth: '280px', marginBottom: '24px' }}>
-                I-scan ang lab reports o results. Tutulungan ka ni GabAi sa pag-intindi ng iba pang dokumento.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '280px' }}>
-                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', background: 'var(--success)', border: 'none' }} onClick={() => cameraInputRef.current?.click()}>
-                  Kunan ng litrato
-                </button>
-                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={() => fileInputRef.current?.click()}>
-                  Mag-upload ng larawan
-                </button>
-              </div>
-            </div>
-          ) : scanning ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px 0' }}>
-              <div className="section-eyebrow">Sinusuri ng AI...</div>
-              {[90, 70, 80].map((w, i) => (
-                <div key={i} className="skeleton" style={{ height: '14px', width: `${w}%` }} />
-              ))}
-            </div>
-          ) : (
-            <div>
-              {previewUrl && <img src={previewUrl} alt="Na-scan" style={{ maxHeight: '200px', width: '100%', objectFit: 'cover', borderRadius: 'var(--radius-md)', marginBottom: '16px' }} />}
-              <span className="badge badge-success" style={{ marginBottom: '12px', display: 'inline-block' }}>Dokumento Nakilala</span>
-              <p className="text-sm" style={{ lineHeight: 1.8, marginBottom: '20px' }}>{SCAN_RESULT}</p>
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                <button className="btn btn-ghost btn-sm" onClick={handleReadResult}>
-                  {speaking ? 'Binabasa...' : 'Basahin para sa akin'}
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setScanned(false); setPreviewUrl(null) }}>I-scan Uli</button>
-              </div>
-            </div>
-          )}
-      </div>
-    </div>
-  )
-}
-
-function TaposNaCard() {
-  const router = useRouter()
-  const { getCurrentEncounter, getLatestEncounter, updateEncounter } = useGabAiStore()
-  const [loading, setLoading] = useState(false)
-
-  const handleTaposNa = () => {
-    setLoading(true)
-    const enc = getCurrentEncounter() || getLatestEncounter()
-    if (enc) updateEncounter(enc.id, { phase: 'complete' })
-    router.push('/navigator/after')
-  }
-
-  return (
-    <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-      <div style={{ background: 'var(--primary)', padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '12px' }}>
-        <h2 className="text-h2" style={{ color: '#fff', marginBottom: '4px' }}>I-save ang iyong encounter</h2>
-        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.8)', maxWidth: '360px' }}>At dumiretso sa After Phase.</p>
-        <button
-          className="btn btn-lg"
-          onClick={handleTaposNa}
-          disabled={loading}
-          style={{ background: '#fff', color: 'var(--primary)', fontWeight: 700, marginTop: '8px' }}
-        >
-          {loading ? 'Sine-save...' : 'Pumunta sa After Phase →'}
-        </button>
-      </div>
+      {!scanned && !scanning ? (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 0', textAlign: 'center',
+          minHeight: '400px', justifyContent: 'center'
+        }}>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(139,90,60,0.4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '20px' }}>
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+            <circle cx="12" cy="13" r="4" />
+          </svg>
+          <h3 style={{ margin: '0 0 12px', fontSize: '1.25rem', fontWeight: 800, color: '#510400' }}>I-scan ang Dokumento</h3>
+          <p style={{ margin: '0 0 32px', fontSize: '0.9375rem', color: '#6B4F3A', lineHeight: 1.6, maxWidth: '320px' }}>
+            I-scan ang lab reports o results.<br />Tutulungan ka ni GabAi sa pag-intindi<br />ng iba pang dokumento.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', maxWidth: '320px' }}>
+            <button
+              style={{ width: '100%', padding: '16px', background: '#510400', color: '#fff', fontSize: '0.875rem', fontWeight: 700, letterSpacing: '0.05em', borderRadius: '30px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(81,4,0,0.2)' }}
+              onClick={() => cameraInputRef.current?.click()}
+            >
+              KUNAN NG LITRATO
+            </button>
+            <button
+              style={{ width: '100%', padding: '16px', background: 'transparent', color: '#510400', fontSize: '0.875rem', fontWeight: 700, letterSpacing: '0.05em', borderRadius: '30px', border: '1px solid rgba(81,4,0,0.3)', cursor: 'pointer' }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              MAG-UPLOAD NG LARAWAN
+            </button>
+          </div>
+        </div>
+      ) : scanning ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px 0' }}>
+          <div className="section-eyebrow">Sinusuri ng AI...</div>
+          {[90, 70, 80].map((w, i) => (
+            <div key={i} className="skeleton" style={{ height: '14px', width: `${w}%` }} />
+          ))}
+        </div>
+      ) : (
+        <div style={{ padding: '24px' }}>
+          {previewUrl && <img src={previewUrl} alt="Na-scan" style={{ maxHeight: '200px', width: '100%', objectFit: 'cover', borderRadius: 'var(--radius-md)', marginBottom: '16px' }} />}
+          <span className="badge badge-success" style={{ marginBottom: '12px', display: 'inline-block' }}>Dokumento Nakilala</span>
+          <p className="text-sm" style={{ lineHeight: 1.8, marginBottom: '20px' }}>{SCAN_RESULT}</p>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button className="btn btn-ghost btn-sm" onClick={handleReadResult}>
+              {speaking ? 'Binabasa...' : 'Basahin para sa akin'}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setScanned(false); setPreviewUrl(null) }}>I-scan Uli</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+type DuringTab = 'karapatan' | 'narinig' | 'lab'
+
+const TABS: { id: DuringTab; label: string; icon: React.ReactNode }[] = [
+  {
+    id: 'karapatan',
+    label: 'Karapatan Mo',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'narinig',
+    label: 'Ano ang Narinig Mo',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+        <line x1="12" y1="19" x2="12" y2="23" />
+        <line x1="8" y1="23" x2="16" y2="23" />
+      </svg>
+    ),
+  },
+  {
+    id: 'lab',
+    label: 'I-scan ang Lab Report',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11m0 0h10m-10 0a2 2 0 0 1-2 2H3m16-2a2 2 0 0 0 2-2V3" />
+        <path d="M3 9h18" />
+      </svg>
+    ),
+  },
+]
+
 export default function DuringPage() {
-  const { currentEncounterId, updateEncounter, getCurrentEncounter, getLatestEncounter } = useGabAiStore()
-  const [completedStep1, setCompletedStep1] = useState(false)
-  const [completedStep2, setCompletedStep2] = useState(false)
-  const [completedStep3, setCompletedStep3] = useState(false)
+  const [activeTab, setActiveTab] = useState<DuringTab>('karapatan')
 
-  // ── JOURNEY PERSISTENCE ──
-  useEffect(() => {
-    const encounter = getCurrentEncounter() || getLatestEncounter()
-    if (encounter && encounter.stepState?.during) {
-      const ds = encounter.stepState.during
-      if (ds.step1) setCompletedStep1(true)
-      if (ds.step2) setCompletedStep2(true)
-      if (ds.step3) setCompletedStep3(true)
-    }
-  }, [currentEncounterId])
+  const tabContent: Record<DuringTab, { tag: string; title: string; subtitle: string; content: React.ReactNode }> = {
+    karapatan: {
+      tag: 'Patient Rights',
+      title: 'Karapatan Mo',
+      subtitle: 'Ayon sa iyong sitwasyon at pasilidad na pupuntahan, ito ang mga karapatan mo bilang pasyente — at ang batas na nagbibigay sa iyo ng karapatang ito.',
+      content: <PatientRightsSection />,
+    },
+    narinig: {
+      tag: 'Recall Assistant',
+      title: 'Ano ang Narinig Mo?',
+      subtitle: 'Isulat ang iyong narinig mula sa doktor — kahit hindi kumpleto, mali ang spelling, o Taglish. Itatama at ipapaliwanag ng GabAi para sa iyo.',
+      content: <RecallAssistantSection />,
+    },
+    lab: {
+      tag: 'Lab & Documents',
+      title: 'I-scan ang Lab Report',
+      subtitle: 'I-scan ang lab results o prescriptions. Ipapaliwanag ng GabAi ang mga medical terms sa simpleng salita.',
+      content: <DocumentScannerSection />,
+    },
+  }
 
-  // Save steps to store when they change
-  useEffect(() => {
-    const id = currentEncounterId || getLatestEncounter()?.id
-    if (id) {
-      const enc = getCurrentEncounter() || getLatestEncounter()
-      if (enc) {
-        updateEncounter(id, {
-          stepState: {
-            ...enc.stepState,
-            during: {
-              step1: completedStep1,
-              step2: completedStep2,
-              step3: completedStep3,
-            }
-          }
-        })
-      }
-    }
-  }, [completedStep1, completedStep2, completedStep3])
-  
-  const step1Ref = useRef<HTMLElement>(null)
-  const step2Ref = useRef<HTMLElement>(null)
-  const step3Ref = useRef<HTMLElement>(null)
-  const step4Ref = useRef<HTMLElement>(null)
+  const current = tabContent[activeTab]
 
   return (
-    <div className="bfr">
-      <section className="phase-sec" ref={step1Ref}>
-        <div className="phase-num-col">
-          <div className="phase-circ active">1</div>
-          <div className="phase-line filled" />
+    <div style={{ height: 'calc(100vh - 168px - 40px)', marginTop: '40px', display: 'flex', gap: '24px', fontFamily: "'Inter', -apple-system, sans-serif" }}>
+
+      {/* ── Left Column: Step/Icon (Simulating Image 1 Before layout) ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '44px', paddingTop: '2px' }}>
+        <div style={{ flexShrink: 0, width: '44px', height: '44px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', border: '2px solid var(--primary)', fontWeight: 800 }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
         </div>
-        <div className="phase-main">
-          <span className="phase-tag">Patient Rights</span>
-          <h1 className="phase-h1">Karapatan Mo</h1>
-          <p className="phase-p">Ayon sa iyong sitwasyon at pasilidad na pupuntahan, ito ang mga karapatan mo bilang pasyente:</p>
-          <div className="phase-main-scrollable" style={{ paddingBottom: '100px' }}>
-            <PatientRightsSection />
-            
-            <button className="phase-pri-btn" style={{ marginTop: '24px' }} onClick={() => { setCompletedStep1(true); setTimeout(() => step2Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
-              Ipagpatuloy <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-            </button>
+      </div>
+
+      {/* ── Right Column: Main Content ── */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* ── Header (Simulating Image 1 typography) ── */}
+        <div style={{ flexShrink: 0, marginBottom: '24px' }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '.7rem', textTransform: 'uppercase',
+            letterSpacing: '.12em', fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)',
+            padding: '5px 14px', borderRadius: '20px', width: 'fit-content', marginBottom: '10px'
+          }}>
+            Patient Navigation
+          </span>
+          <h1 style={{
+            fontFamily: "'Inter', -apple-system, sans-serif", fontSize: '2.5rem', fontWeight: 800,
+            color: 'var(--text-primary)', margin: '0 0 8px', lineHeight: 1.1, letterSpacing: '-.03em'
+          }}>
+            During Phase
+          </h1>
+          <p style={{
+            fontSize: '.9375rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0, maxWidth: '560px'
+          }}>
+            Manage your care, protect your rights, and digitize important files.
+          </p>
+        </div>
+
+        {/* ── Pill Tabs ── */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexShrink: 0, overflowX: 'auto', paddingBottom: '4px' }}>
+          {TABS.map(tab => {
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 22px',
+                  borderRadius: '40px',
+                  fontSize: '0.875rem',
+                  fontWeight: isActive ? 700 : 600,
+                  color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  background: isActive ? '#fff' : 'transparent',
+                  border: isActive ? '1.5px solid var(--border)' : '1.5px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  whiteSpace: 'nowrap',
+                  boxShadow: isActive ? '0 2px 8px rgba(61,27,17,0.04)' : 'none',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.5)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'transparent'
+                  }
+                }}
+              >
+                <span style={{ opacity: isActive ? 1 : 0.6, color: isActive ? 'var(--primary)' : 'inherit' }}>{tab.icon}</span>
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ── Big Card Frame ── */}
+        <div style={{
+          flex: 1,
+          minHeight: 0,
+          background: '#fff',
+          borderRadius: '24px',
+          border: '1px solid var(--border-light)',
+          boxShadow: '0 8px 30px rgba(61,27,17,0.03)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}>
+          {/* Scrollable interior */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '36px 40px' }}>
+            <div style={{ maxWidth: '820px', margin: '0 auto' }}>
+
+              {/* Tab Content (Direct injection inside the white card) */}
+              <div key={activeTab} style={{ animation: 'duringFadeIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
+                {current.content}
+              </div>
+            </div>
           </div>
         </div>
-      </section>
 
-      <section className={`phase-sec ${completedStep1 ? '' : 'locked'}`} ref={step2Ref}>
-        <div className="phase-num-col">
-          <div className={`phase-circ ${completedStep1 ? 'active' : ''}`}>2</div>
-          <div className={`phase-line ${completedStep2 ? 'filled' : ''}`} />
-        </div>
-        <div className="phase-main">
-          <span className="phase-tag">Recall Assistant</span>
-          <h1 className="phase-h1">Ano ang Narinig Mo?</h1>
-          <p className="phase-p">Isulat ang iyong narinig mula sa doktor — kahit hindi kumpleto, mali ang spelling, o Taglish. Itatama at ipapaliwanag ng GabAi para sa iyo.</p>
-          <div className="phase-main-scrollable" style={{ paddingBottom: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <RecallAssistantSection />
+      </div>
 
-            <button className="phase-pri-btn" style={{ marginTop: '24px', alignSelf: 'center' }} onClick={() => { setCompletedStep2(true); setTimeout(() => step3Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
-              Susunod: Lab Reports <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className={`phase-sec ${completedStep2 ? '' : 'locked'}`} ref={step3Ref}>
-        <div className="phase-num-col">
-          <div className={`phase-circ ${completedStep2 ? 'active' : ''}`}>3</div>
-          <div className={`phase-line ${completedStep3 ? 'filled' : ''}`} />
-        </div>
-        <div className="phase-main">
-          <span className="phase-tag">Lab & Documents</span>
-          <h1 className="phase-h1">I-scan ang Lab Report</h1>
-          <p className="phase-p">I-scan ang lab reports o results. Tutulungan ka ni GabAi sa pag-intindi ng iba pang dokumento.</p>
-          <div className="phase-main-scrollable" style={{ paddingBottom: '100px' }}>
-            <DocumentScannerSection />
-
-            <button className="phase-pri-btn" style={{ marginTop: '24px' }} onClick={() => { setCompletedStep3(true); setTimeout(() => step4Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
-              Susunod: Tapusin <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className={`phase-sec ${completedStep3 ? '' : 'locked'}`} ref={step4Ref}>
-        <div className="phase-num-col">
-          <div className={`phase-circ ${completedStep3 ? 'active' : ''}`}>4</div>
-        </div>
-        <div className="phase-main">
-          <span className="phase-tag">Done</span>
-          <h1 className="phase-h1">Tapos na?</h1>
-          <p className="phase-p">Pumunta sa next phase para sa follow-ups at survey.</p>
-          <div className="phase-main-scrollable">
-            <TaposNaCard />
-          </div>
-        </div>
-      </section>
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        .bfr{margin:-48px}
-        .phase-sec{height:100vh;display:flex;padding:40px 48px;gap:24px;box-sizing:border-box;transition:opacity .4s,filter .4s;overflow:hidden}
-        .phase-sec.locked{opacity:.15;pointer-events:none;filter:blur(3px)}
-        .phase-num-col{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:44px;padding-top:2px}
-        .phase-circ{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;border:2px solid var(--border);color:var(--text-muted);background:#fff;transition:all .35s;flex-shrink:0}
-        .phase-circ.active{background:var(--text-primary);border-color:var(--text-primary);color:#fff}
-        .phase-circ.done{background:var(--primary);border-color:var(--primary);color:#fff}
-        .phase-line{flex:1;width:2px;background:var(--border-light);margin-top:10px;transition:background .4s}
-        .phase-line.filled{background:var(--primary)}
-        .phase-main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
-        .phase-tag{display:inline-flex;align-items:center;gap:6px;font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--primary);background:var(--primary-light);padding:5px 14px;border-radius:20px;width:fit-content;margin-bottom:14px}
-        .phase-h1{font-family:'Inter',-apple-system,sans-serif;font-size:2.5rem;font-weight:800;color:var(--text-primary);margin:0 0 10px;line-height:1.1;letter-spacing:-.03em}
-        .phase-p{font-size:.9375rem;color:var(--text-secondary);line-height:1.6;margin:0 0 28px;max-width:560px}
-        .phase-main-scrollable{flex:1;overflow-y:auto;padding-right:8px;padding-bottom:40px}
-        .phase-pri-btn{display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:#fff;border:none;border-radius:40px;padding:9px 18px;font-weight:700;font-size:.6875rem;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
-        .phase-pri-btn:hover{background:var(--primary-hover)}.phase-pri-btn:disabled{opacity:.35;cursor:not-allowed}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        @keyframes duringFadeIn {
+          from { opacity: 0; transform: translateY(12px) scale(0.99); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
       ` }} />
     </div>
   )
 }
+
+
