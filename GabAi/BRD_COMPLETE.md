@@ -101,44 +101,66 @@ This is not a failure of healthcare availability. It is a failure of healthcare 
 | Storage | Firestore `users/{userId}` document via anonymous auth |
 | UX | Large buttons, minimal text, voice-readable labels, completable with one hand |
 
-### 5.2 PHASE 1: BEFORE — "Handa Ka Na Ba?" (Preparation Companion)
+### 5.2 PHASE 1: BEFORE — "Handa Ka Na Ba?" (4-Step Preparation Companion)
 
-#### Feature 1A: Situation Input (Voice or Text)
+The Before phase is implemented as a **4-step vertical wizard** with step indicators, scroll-to-next behavior, and progressive disclosure (locked steps blur until preceding step completes).
+
+#### Step 1: Patient Intake (Situation Input)
 | Requirement | Detail |
 |---|---|
-| Input method | Push-to-talk voice (primary) or text input (fallback) |
-| Voice tech | Web Speech API (`webkitSpeechRecognition`), lang: `fil-PH` with `en-US` fallback |
-| Push-to-talk UX | Large mic button (80px), hold to record, release to send. Animated pulse while recording. |
-| Processing | Voice transcript → sent to Gemini Care Navigation Prompt |
-| Output | Structured care plan (see Gemini Prompt Architecture, Section 8) |
+| Input method | Text input with autocomplete suggestions. Two paths: "I have a diagnosis" or "I need a specific service" |
+| Suggestions (Diagnosis) | Hypertension, Tuberculosis, Diabetes, Dengue, Pneumonia, Asthma, UTI, Anemia, Thyroid Disorder, etc. (25 conditions) |
+| Suggestions (Service) | Chest X-Ray, CBC, ECG, MRI, Ultrasound, Urinalysis, Cancer Treatment, Chemotherapy, Dialysis, Neurosurgery, etc. (27 services) |
+| Processing | Text → POST `/api/classify` → Gemini AI classification (title, class/department, risk/care level) |
+| AI Model | Gemini 2.0 Flash (with fallback to Gemini 1.5 Flash). JSON response mode. |
+| Output | Classification card showing: short title, target department, recommended care level |
+| Fallback | If all models fail, returns: `{ title: "General Checkup", class: "General Consultation", risk: "Local Health Center" }` |
 
-**Care Plan Output Structure:**
+**Classification Output Structure:**
 
 | Field | Description |
 |---|---|
-| Facility Level | Barangay Health Center / RHU / District Hospital / ER |
-| Recommended Facilities | 2-3 specific facilities near user's selected city, with addresses |
-| Documents Checklist | What to bring + where/how to get each document for free |
-| Commute Options | Estimated commute method and cost from user's city |
-| Queue Estimate | Typical operating hours, peak times, estimated wait |
-| Risk Flag | Pre-visit triage: green (safe to wait) / yellow (go soon) / red (ER now) |
-| Risk Rationale | Plain-language explanation combating "OA" mindset |
+| `title` | Short 2-3 word summary (e.g., "Cancer Screening") |
+| `class` | Target department or service type (e.g., "Oncology Department") |
+| `risk` | Recommended care level (e.g., "Tertiary Hospital", "Diagnostic Center") |
 
-#### Feature 1B: "Dapat Sabihin Mo" Script Generator
+#### Step 2: Facility Routing (Map + Filtering Engine)
 | Requirement | Detail |
 |---|---|
-| Input | Structured symptoms from 1A + Alaala Ko history (if exists) |
-| Output | Clear, respectful Taglish script the patient can read aloud to the doctor |
-| Display | Readable card with large text + "Read it to me" voice playback button |
-| History-aware | If prior encounters exist, script includes: "Last time, your doctor noted X — mention this" |
-| Tone | Respectful but clinically specific — transforms vague complaints into useful medical narratives |
+| Location input | GPS geolocation, text search (autocomplete from facility names/addresses/districts), or click-to-pin on Leaflet map |
+| Map provider | Leaflet (OpenStreetMap) — loaded via CDN, dynamic marker placement with custom icons and tooltips |
+| Facility database | 47 verified Manila facilities in `facilities.ts`: 16 hospitals, 3 clinics, 28 BHCs. Sources: pgh.gov.ph, jrrmmc.gov.ph, cghmc.com.ph, usthospital.com.ph, manila.gov.ph, DOH records |
+| Display | Split grid: interactive map (left) + scrollable facility cards (right), each showing name, address, distance, travel time, tags |
 
-#### Feature 1C: Facility Map
+**Filtering Engine (3 Sort Modes + Secondary Filters):**
+
+| Sort Mode | Behavior |
+|---|---|
+| **Near Me (≤1hr)** | Progressive distance: starts at 1hr travel (10km at 10km/hr avg Manila commute speed). If no facilities found, expands by 1hr increments up to 5hrs. Shows facilities within nearest viable radius. |
+| **Free Services** | Hard-filters to government/free facilities: `isBHC \|\| isPhilHealthKonsulta \|\| hasMalasakitCenter \|\| tags includes 'DOH' or 'City-run'`. Sorted by distance. PGH, JRRMMC, San Lazaro, OMMC, GABMMC, TMC, all BHCs included. |
+| **Best for My Need** | Relevance scoring (never removes facilities): exact service match (+5), direct/reverse match (+3), keyword token match (+1), tag/risk-level match (+1). Sorted by score, then distance. |
+
+**Secondary Checkbox Filters (Hard Removal):**
+PhilHealth Accredited, Walk-in Accepted, 24/7 Emergency, Outpatient (OPD), Inpatient/Admission, Laboratory/Diagnostics, Malasakit Center, Senior/PWD Lane, Accepts Referral.
+
+**Facility Card Labels:**
+`FREE (BHC)` → `GOV'T FREE` (Malasakit) → `GOV'T` (DOH/City-run) → `PHILHEALTH` → `PRIVATE`
+
+#### Step 3: Travel & Gastos (Commute + Expense Planning)
 | Requirement | Detail |
 |---|---|
-| Display | Google Maps Embed API showing recommended facility |
-| Data shown | Facility name, address, operating hours |
-| Interaction | Tap to open in Google Maps app for directions |
+| Trigger | User selects a facility → "Compute Travel & Gastos" prompt overlay |
+| Processing | POST `/api/commute` → Gemini generates transit plan with LTFRB fare matrices |
+| Output | Receipt-style vertical stepper: origin → transport legs (Jeepney, Tricycle, Bus, Walk, LRT, MRT) → destination. Each leg shows mode icon, instruction, fare. |
+| Route map | Second Leaflet map showing origin-to-destination with color-coded polyline segments per transport mode and labeled waypoints |
+| Totals | Total travel time + total gastos (₱) displayed at bottom |
+
+#### Step 4: Requirements Checklist (Document Preparation)
+| Requirement | Detail |
+|---|---|
+| General docs | Valid ID (primary IDs listed), PhilHealth ID or MDR, Certificate of Indigency |
+| PGH-specific | Shown only when selected facility is PGH (id: `h4` or name includes "Philippine General"). Includes: PGH Blue Card, Valid Referral Form, Clinical Abstract/Medical Certificate, Printed Appointment Slip (OCRA system) |
+| UX | Interactive checkboxes for each document. Cards with icons. PGH card has special accent styling. |
 
 ### 5.3 PHASE 2: DURING — "Nandito Ka Na" (Encounter Support)
 
@@ -289,57 +311,43 @@ User (Voice/Text/Camera)
 └──────────────────┘
 ```
 
-### Route Structure (Next.js App Router)
+### Route Structure (Next.js App Router) — As Implemented
 
 ```
 app/
 ├── page.tsx                    # Landing page
-├── layout.tsx                  # Root layout + PWA head
+├── layout.tsx                  # Root layout + sidebar navigation
+├── globals.css                 # UI UX ProMax design system (60/30/10 palette)
 ├── onboarding/
 │   └── page.tsx                # Onboarding flow
 ├── navigator/
-│   ├── page.tsx                # Main navigator (phase router)
+│   ├── layout.tsx              # Navigator layout shell
+│   ├── page.tsx                # Phase router (redirects)
 │   ├── before/
-│   │   └── page.tsx            # Before phase
+│   │   ├── page.tsx            # 4-step Before wizard (900+ lines)
+│   │   └── facilities.ts      # 47 verified Manila facilities + haversine distance
 │   ├── during/
 │   │   └── page.tsx            # During phase
 │   └── after/
 │       └── page.tsx            # After phase
-├── history/
-│   └── page.tsx                # Alaala Ko — encounter history
-├── emergency/
-│   └── page.tsx                # Emergency hotlines
 ├── about/
 │   └── page.tsx                # About page
 ├── api/
-│   ├── gemini/
-│   │   ├── navigate/route.ts   # Care navigation
-│   │   ├── script/route.ts     # Script generator
-│   │   ├── summarize/route.ts  # Encounter summarizer
-│   │   ├── vision/route.ts     # Document camera
-│   │   ├── followup/route.ts   # Follow-up evaluator
-│   │   └── whatsapp/route.ts   # WhatsApp summary
-│   └── facilities/route.ts     # Facility lookup
-├── components/
-│   ├── VoiceInput.tsx           # Push-to-talk component
-│   ├── VoicePlayback.tsx        # TTS playback component
-│   ├── CarePlanCard.tsx         # Structured care plan display
-│   ├── ScriptCard.tsx           # Dapat Sabihin Mo display
-│   ├── DocumentCamera.tsx       # Camera capture + results
-│   ├── EncounterLogger.tsx      # Voice logger + transcript
-│   ├── FacilityMap.tsx          # Google Maps embed
-│   ├── EmergencyBanner.tsx      # Persistent emergency CTA
-│   ├── PhaseNavigation.tsx      # Before/During/After tabs
-│   └── ChecklistItem.tsx        # Interactive checklist
-├── lib/
-│   ├── firebase.ts              # Firebase init
-│   ├── gemini.ts                # Gemini client + prompts
-│   ├── speech.ts                # Web Speech API wrapper
-│   ├── emergency.ts             # Emergency keyword detection
-│   └── types.ts                 # TypeScript types
-└── data/
-    └── facilities.json          # Seed facility data (Metro Manila)
+│   ├── classify/
+│   │   └── route.ts            # Gemini AI classification (diagnosis/service → department + care level)
+│   └── commute/
+│       └── route.ts            # Gemini AI commute planner (origin/dest → transit legs + fares)
+└── .env.local                  # GEMINI_API_KEY, NEXT_PUBLIC_MAPS_API_KEY
 ```
+
+### Key Implementation Files
+
+| File | Purpose | Lines |
+|---|---|---|
+| `before/page.tsx` | 4-step wizard: Patient Intake → Facility Routing (map + filters) → Travel & Gastos → Document Checklist | ~900 |
+| `before/facilities.ts` | 47 Manila facilities (16 hospitals, 3 clinics, 28 BHCs) with 27 filterable fields each. Includes `haversineKm()` distance calculation. | ~115 |
+| `api/classify/route.ts` | Gemini classification with model fallback chain (`gemini-2.0-flash` → `gemini-1.5-flash`). Returns JSON: `{title, class, risk}` | ~95 |
+| `api/commute/route.ts` | Gemini commute planner using LTFRB fare matrices. Returns `{totalTime, totalFare, legs[]}` | ~60 |
 
 ---
 
@@ -411,24 +419,47 @@ interface Encounter {
 }
 ```
 
-### Collection: `facilities/{facilityId}`
+### Facility Data Model (As Implemented in `before/facilities.ts`)
 ```typescript
 interface Facility {
-  name: string;
-  type: 'bhc' | 'rhu' | 'district_hospital' | 'city_hospital' |
-        'provincial_hospital' | 'medical_center' | 'private';
-  address: string;
-  city: string;
-  region: 'metro_manila';
-  coordinates: { lat: number; lng: number };
-  operatingHours: string;
-  peakHours: string;
-  philHealthAccredited: boolean;
-  servicesOffered: string[];
-  averageWaitMinutes: number | null;   // Updated from community data
-  contactNumber: string;
+  id: string                          // e.g., 'h4' (hospitals), 'c1' (clinics), 'b1' (BHCs)
+  name: string                        // e.g., 'Philippine General Hospital'
+  address: string
+  district: string                    // 'District I' through 'District VI'
+  lat: number
+  lng: number
+  type: 'Hospital' | 'BHC' | 'Clinic'
+  services: string[]                  // Verified from official hospital websites
+  tags: string[]                      // e.g., ['DOH','Tertiary','Level III']
+  // Filter fields (27 total)
+  isBHC: boolean
+  isPhilHealthKonsulta: boolean
+  isPhilHealthAccredited: boolean
+  acceptsWalkIn: boolean
+  acceptsReferral: boolean
+  hasEmergency: boolean
+  inpatient: boolean
+  outpatient: boolean
+  hasLaboratory: boolean
+  hasDiagnostics: boolean
+  hasMalasakitCenter: boolean         // Key flag for "Free" filter
+  hasSeniorLane: boolean
+  hours: string
+  is24Hours: boolean
+  typicalWaitLevel: 'low' | 'medium' | 'high'
 }
 ```
+
+**Facility Database Summary (47 facilities, verified sources):**
+
+| Category | Count | Tags | Free Filter |
+|---|---|---|---|
+| DOH-retained hospitals | 5 (SLH, Fabella, JRRMMC, PGH, TMC) | `DOH` | ✅ via DOH/Malasakit |
+| City-run hospitals | 5 (OMMC, GABMMC, Sta. Ana, JASGM, OS) | `City-run` | ✅ via City-run/Malasakit |
+| Private hospitals | 6 (Manila Doctors, Chinese General, UST, MMC, MJH, MCU-FDT) | `Private` | ❌ |
+| Diagnostic clinics | 2 (Hi-Precision, QualiMed) | `Private` | ❌ |
+| PhilHealth Konsulta | 1 (Quiapo) | `PhilHealth` | ✅ via Konsulta |
+| Barangay Health Centers | 28 (Districts I–VI + City Health Offices) | `BHC` | ✅ via BHC |
 
 ### Collection: `community/experiences/{experienceId}`
 ```typescript
@@ -447,62 +478,55 @@ interface CommunityExperience {
 
 ## 8. GEMINI PROMPT ARCHITECTURE
 
-### 8.1 Care Navigation Prompt (Before Phase)
+### 8.1 Classification Prompt (Before Phase — Step 1)
+
+**API Route:** `POST /api/classify`
+
+**Model Fallback Chain:** `gemini-2.0-flash` → `gemini-1.5-flash`
 
 ```
-SYSTEM:
-You are [APP NAME], a Filipino healthcare navigation companion.
-You help patients find the right facility, prepare documents, and
-understand what to expect — so no Filipino wastes another day lost
-in the healthcare system.
+The user stated their diagnosis/condition is: "{query}".
+(OR: The user needs a specific healthcare service/procedure: "{query}".)
 
-RULES:
-1. You are NOT a doctor. Never diagnose. You are a navigation companion.
-2. For life-threatening symptoms (chest pain, difficulty breathing,
-   uncontrolled bleeding, loss of consciousness, seizures), IMMEDIATELY
-   return riskFlag: "red" and direct to ER / call 911.
-3. Use Philippine healthcare levels:
-   Level 1: Barangay Health Center (BHC) — free, minor/preventive
-   Level 2: Rural Health Unit (RHU) / City Health Office — free, referrals
-   Level 3: District/City Hospital — PhilHealth accepted
-   Level 4: Medical Center / Tertiary — complex cases
-4. ALWAYS combat the "OA" (over-acting) mindset. If symptoms warrant
-   urgency, explicitly tell the user: "Hindi ka OA. Tama lang na
-   magpatingin ka."
-5. Be specific about documents — not just what to bring, but WHERE
-   and HOW to get each one for free.
-6. Respond with warmth. Use plain Filipino/Taglish (based on user
-   language preference). Never use medical jargon without explanation.
+Classify the necessary healthcare facility type.
 
-FACILITY DATABASE:
-{facilitiesFromFirestore}
-
-USER CONTEXT:
-- Location: {userLocation}
-- PhilHealth: {philHealthStatus}
-- Language: {languagePreference}
-- Prior encounters (Alaala Ko): {alaalaSummary}
-
-USER INPUT: {rawInput}
-
-OUTPUT FORMAT (JSON):
+Return a JSON object STRICTLY with the following structure:
 {
-  "facilityLevel": "string",
-  "recommendedFacilities": [
-    {"name": "string", "address": "string", "facilityId": "string", "why": "string"}
-  ],
-  "documentsChecklist": [
-    {"document": "string", "whereToGet": "string", "isFree": true}
-  ],
-  "commuteOptions": "string",
-  "queueEstimate": "string",
-  "riskFlag": "green|yellow|red",
-  "riskLevel": "string",
-  "riskRationale": "string",
-  "whatToExpect": "string",
-  "summary": "string"
+  "title": "A short 2-3 word summary of the action",
+  "class": "The Target Department or Service Type",
+  "risk": "The Recommended Care Level (e.g., Primary Care, Diagnostic Center, General Hospital)"
+}
+Do not include markdown blocks, just the raw JSON.
+```
+
+**Features:**
+- `responseMimeType: "application/json"` for guaranteed JSON output
+- Automatic fallback to next model if API error or blocked response
+- Strips markdown code fences if present in response
+- Graceful fallback: `{ title: "General Checkup", class: "General Consultation", risk: "Local Health Center" }`
+
+### 8.1b Commute Planning Prompt (Before Phase — Step 3)
+
+**API Route:** `POST /api/commute`
+
+```
+Generate a commute plan from ({originLat}, {originLng}) to {facilityName}
+at ({destinationLat}, {destinationLng}) in Manila.
+
+Use realistic Manila public transit: Jeepney, Tricycle, Bus, Walk, LRT, MRT.
+Use official LTFRB fare matrices.
+
+Return JSON:
+{
+  "totalTime": "estimated travel time string",
+  "totalFare": number,
+  "legs": [
+    { "mode": "Jeepney|Tricycle|Bus|Walk|LRT|MRT", "instruction": "string", "fare": number }
+  ]
 }
 ```
+
+**UI Integration:** Receipt-style vertical stepper with color-coded transport icons, route map with polyline segments per leg, and total gastos display.
 
 ### 8.2 Script Generator Prompt (Before Phase)
 
@@ -736,32 +760,70 @@ const geminiConfig = {
 └──────────────────────────────┘
 ```
 
-#### Navigator — Before Phase
+#### Navigator — Before Phase (4-Step Wizard)
 ```
-┌──────────────────────────────┐
-│ ← Back    BEFORE    [•][•][○]│
-├──────────────────────────────┤
-│ ┌──────────────────────────┐ │
-│ │ YOUR CARE PLAN           │ │
-│ │ ────────────────────     │ │
-│ │ 🏥 Go to: QC BHC        │ │
-│ │ 📍 [Map Embed]           │ │
-│ │ 📋 Bring: PhilHealth ID, │ │
-│ │    birth cert...         │ │
-│ │ 💰 Cost: ₱0 (PhilHealth) │ │
-│ │ ⏱️ Wait: ~1-2 hrs        │ │
-│ │ 🟢 Safe to wait          │ │
-│ └──────────────────────────┘ │
-│ ┌──────────────────────────┐ │
-│ │ 📝 DAPAT SABIHIN MO     │ │
-│ │ "Doc, 3 days na po..."   │ │
-│ │         [🔊 Read to Me]  │ │
-│ └──────────────────────────┘ │
-│                              │
-│ [Proceed to DURING →]       │
-├──────────────────────────────┤
-│ 🚨 Emergency? Call 911      │
-└──────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│ ← Back    BEFORE - Handa Ka Na Ba?    [1][2][3][4]│
+├──────────────────────────────────────────────────┤
+│ STEP 1: PATIENT INTAKE                            │
+│ ┌──────────────────────────────────────────┐      │
+│ │ [I have a diagnosis] [I need a service]  │      │
+│ │ ┌─────────────────────────────────┐      │      │
+│ │ │ 🔍  Enter condition/service...  │      │      │
+│ │ └─────────────────────────────────┘      │      │
+│ │ Suggestions: [Hypertension] [Diabetes]  │      │
+│ │ [Pneumonia] [UTI] [MRI] [ECG]...        │      │
+│ │                                         │      │
+│ │ ┌─── AI CLASSIFICATION ───┐             │      │
+│ │ │ Title: Cancer Screening  │             │      │
+│ │ │ Dept: Oncology            │             │      │
+│ │ │ Level: Tertiary Hospital  │             │      │
+│ │ └──────────────────────────┘             │      │
+│ └──────────────────────────────────────────┘      │
+│                                                    │
+│ STEP 2: FACILITY ROUTING                           │
+│ ┌─────────────────┬──────────────────────┐        │
+│ │  [📍 MAP]       │  Location Bar:       │        │
+│ │                 │  [📍 GPS] or search  │        │
+│ │  • markers      │                      │        │
+│ │  • click-to-pin │  [Near Me] [Free]    │        │
+│ │  • tooltips     │  [Best Match]        │        │
+│ │                 │                      │        │
+│ │                 │  ☐ PhilHealth ☐ ER   │        │
+│ │                 │  ☐ Walk-in ☐ Lab     │        │
+│ ├─────────────────┤                      │        │
+│ │ Facility Cards: │  PGH · 3.2km        │        │
+│ │ [GOV'T FREE]    │  • GOV'T FREE       │        │
+│ │ JRRMMC · 2.1km  │  [Select] →         │        │
+│ │ • DOH Tertiary  │                      │        │
+│ └─────────────────┴──────────────────────┘        │
+│                                                    │
+│ STEP 3: TRAVEL & GASTOS                            │
+│ ┌──────────────────────────────────────────┐      │
+│ │ 📍 Your Location                        │      │
+│ │    ↓ 🚐 Jeepney · Ride along Taft · ₱13│      │
+│ │    ↓ 🚶 Walk · 5 min                   │      │
+│ │ 🏥 Philippine General Hospital          │      │
+│ │ ─────────────────────────────            │      │
+│ │ ⏱ ~35 min    💰 ₱13 total              │      │
+│ └──────────────────────────────────────────┘      │
+│                                                    │
+│ STEP 4: REQUIREMENTS CHECKLIST                     │
+│ ┌──────────────────────────────────────────┐      │
+│ │ ☐ Valid ID (government-issued)           │      │
+│ │ ☐ PhilHealth ID or MDR                   │      │
+│ │ ☐ Certificate of Indigency               │      │
+│ │                                          │      │
+│ │ ┌── 🏥 PGH SPECIFIC ──────────────┐    │      │
+│ │ │ ☐ PGH Blue Card                  │    │      │
+│ │ │ ☐ Valid Referral Form             │    │      │
+│ │ │ ☐ Clinical Abstract               │    │      │
+│ │ │ ☐ Printed Appointment Slip (OCRA) │    │      │
+│ │ └──────────────────────────────────┘    │      │
+│ └──────────────────────────────────────────┘      │
+├──────────────────────────────────────────────────┤
+│ 🚨 Emergency? Call 911                            │
+└──────────────────────────────────────────────────┘
 ```
 
 #### Navigator — During Phase
