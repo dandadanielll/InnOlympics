@@ -653,13 +653,13 @@ export default function AfterPage() {
                 <p className="text-sm" style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '16px' }}>
                   Ang encounter na ito ay naka-imbak sa iyong device. Sa susunod mong bisita, awtomatikong gagamitin ng GabAi ang kasaysayang ito para mas maging handa ka.
                 </p>
-                <button
-                  className="btn btn-primary"
-                  style={{ width: '100%' }}
-                  onClick={() => router.push('/dashboard')}
-                >
-                  Bumalik sa Dashboard
-                </button>
+                  <button
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={() => router.push('/history')}
+                  >
+                    Bumalik sa Dashboard
+                  </button>
               </div>
             </div>
           </div>
