@@ -150,7 +150,7 @@ export default function BeforePage() {
   useEffect(() => {
     // 1. Ensure we have an active "before" encounter
     let encounter = getCurrentEncounter()
-    
+
     if (!encounter) {
       const latest = getLatestEncounter()
       if (latest && (latest.phase === 'before' || latest.phase === 'during')) {
@@ -467,19 +467,19 @@ export default function BeforePage() {
     setIsClassifying(true)
     try {
       const res = await fetch('/api/classify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ needType, query }) })
-      const data = await res.json(); 
-      setClassification(data); 
+      const data = await res.json();
+      setClassification(data);
       setCompletedStep1(true)
-      
+
       // Update store
       if (currentEncounterId) {
-        updateEncounter(currentEncounterId, { 
-          needType: needType as any, 
-          symptoms: query, 
-          classification: data 
+        updateEncounter(currentEncounterId, {
+          needType: needType as any,
+          symptoms: query,
+          classification: data
         })
       }
-      
+
       setTimeout(() => step2Ref.current?.scrollIntoView({ behavior: 'smooth' }), 600)
     } catch (e) { console.error(e) } finally { setIsClassifying(false) }
   }
@@ -487,7 +487,7 @@ export default function BeforePage() {
   const handleGoToStep3 = async () => {
     if (!selectedFacility || userLat === null || userLng === null) return
     setShowGastosPrompt(false); setCompletedStep2(true); setIsPlanning(true)
-    
+
     // Update store with facility and location
     if (currentEncounterId) {
       updateEncounter(currentEncounterId, {
@@ -501,7 +501,7 @@ export default function BeforePage() {
       const res = await fetch('/api/commute', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ originLat: userLat, originLng: userLng, destinationLat: selectedFacility.lat, destinationLng: selectedFacility.lng, facilityName: selectedFacility.name }) })
       const plan = await res.json()
       setCommutePlan(plan)
-      
+
       // Update store with commute plan
       if (currentEncounterId) {
         updateEncounter(currentEncounterId, { commutePlan: plan })
