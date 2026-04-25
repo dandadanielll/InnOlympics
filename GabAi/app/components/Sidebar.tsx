@@ -120,17 +120,17 @@ export default function Sidebar() {
           alignItems: 'center',
           justifyContent: 'space-between',
           ...(!scrolled && {
-            background: pathname === '/navigator/before' 
-              ? 'transparent' 
+            background: pathname === '/navigator/before'
+              ? 'transparent'
               : 'linear-gradient(to bottom, rgba(242,236,220,0.28) 0%, rgba(242,236,220,0) 100%)'
           })
         }}
       >
         {/* Logo Section */}
         <Link href="/" className="flex items-center gap-4 transition-all duration-700 cursor-pointer group">
-          <img 
-            src="/GabAI-logo.png" 
-            alt="GabAI Logo" 
+          <img
+            src="/GabAI-logo.png"
+            alt="GabAI Logo"
             className={`transition-all duration-700 object-contain ${scrolled ? "h-10" : "h-14"}`}
           />
           <h1 className={`logo-container transition-all duration-700 ${scrolled ? "text-2xl mt-0.5" : "text-4xl"}`}>
@@ -140,7 +140,7 @@ export default function Sidebar() {
         </Link>
 
         {/* Navigation Tabs */}
-        <ul 
+        <ul
           className={`hidden md:flex items-center transition-all duration-700 ${scrolled ? "gap-14" : "gap-20"}`}
           style={{ display: 'flex', alignItems: 'center', listStyle: 'none', margin: 0, padding: 0 }}
         >
