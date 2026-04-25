@@ -6,6 +6,7 @@ import { DocumentChecklist } from './DocumentChecklist'
 
 import { CONDITIONS } from './conditions'
 import { SERVICES } from './services'
+import { PGH_ESTIMATES } from './pgh_estimates'
 
 const SECONDARY_FILTERS = [
   { key:'philhealth', label:'PhilHealth Accredited', field:'isPhilHealthAccredited' },
@@ -42,7 +43,39 @@ const MODE_COLORS: Record<string, string> = {
   'MRT': '#c0392b',
 }
 
-declare global { interface Window { L: any } }
+// ── LTFRB 2024 Official Fare Matrix (hardcoded, no AI needed) ────────────────
+const LTFRB = { jeepney:{base:13,free:4,perKm:1.80}, bus:{base:15,free:5,perKm:2.20}, lrt:{base:13,max:35,perKm:1.50}, mrt:{base:13,max:28,perKm:1.00} }
+function computeLTFRBFare(mode:string, km:number):number {
+  if(mode==='Jeepney') return Math.round(Math.max(LTFRB.jeepney.base, LTFRB.jeepney.base+Math.max(0,km-LTFRB.jeepney.free)*LTFRB.jeepney.perKm))
+  if(mode==='Bus') return Math.round(Math.max(LTFRB.bus.base, LTFRB.bus.base+Math.max(0,km-LTFRB.bus.free)*LTFRB.bus.perKm))
+  if(mode==='LRT') return Math.min(LTFRB.lrt.max, Math.round(LTFRB.lrt.base+km*LTFRB.lrt.perKm))
+  if(mode==='MRT') return Math.min(LTFRB.mrt.max, Math.round(LTFRB.mrt.base+km*LTFRB.mrt.perKm))
+  return 0
+}
+function parseGMapsStep(step:any, dest:string):{mode:string;instruction:string;fare:number} {
+  const km=(step.distance?.value||0)/1000, dist=step.distance?.text||`${km.toFixed(1)} km`
+  if(step.travel_mode==='WALKING') return {mode:'Walk', instruction:`Maglakad papasok. (${dist})`, fare:0}
+  const tr=step.transit||step.transit_details||{}, vt=(tr.line?.vehicle?.type||'').toUpperCase()
+  const lineName=tr.line?.short_name||tr.line?.name||'', headsign=tr.headsign||''
+  const stops=tr.num_stops?` (${tr.num_stops} hinto)`:``
+  let mode='Jeepney'
+  if(['SUBWAY','METRO_RAIL','TRAM','RAIL'].includes(vt)) mode=(lineName.toLowerCase().includes('mrt')||headsign.toLowerCase().includes('mrt'))?'MRT':'LRT'
+  else if(vt==='BUS') mode='Bus'
+  const fare=computeLTFRBFare(mode,km)
+  const instr=`Sumakay ng ${lineName||mode}${headsign?` papuntang ${headsign}`:''}${stops}. (${dist})`
+  return {mode,instruction:instr,fare}
+}
+function getFacilityTagline(f:{type:string;tags:string[];isBHC:boolean;isPhilHealthKonsulta:boolean;services:string[]}, cls:string|undefined):string {
+  const isFree=f.isBHC||f.isPhilHealthKonsulta, isGovt=f.tags.some(t=>t==='DOH'||t==='City-run')
+  const level=f.tags.find(t=>t.includes('Level')||t==='Tertiary'||t==='Secondary'||t==='Primary')||''
+  const cat=isFree?'Free BHC':isGovt?`Gov't ${level}`.trim():`Private ${level}`.trim()
+  const need=(cls||'').toLowerCase().split(/[/,]/)[0].trim()
+  let featured=need?f.services.filter(s=>s.toLowerCase().includes(need)||need.split(' ').some((w:string)=>w.length>3&&s.toLowerCase().includes(w))):[] as string[]
+  if(!featured.length) featured=f.services.slice(0,3)
+  const extra=f.services.length>featured.length?` +${f.services.length-featured.length} more`:''
+  return `${cat} · ${featured.slice(0,3).join(', ')}${extra}`
+}
+declare global { interface Window { L: any; google: any } }
 
 export default function BeforePage() {
   const [completedStep1, setCompletedStep1] = useState(false)
@@ -83,9 +116,14 @@ export default function BeforePage() {
   const [selectedFacility, setSelectedFacility] = useState<Facility|null>(null)
   const [showGastosPrompt, setShowGastosPrompt] = useState(false)
 
+  // Step 5
+  const step5Ref = useRef<HTMLElement>(null)
+  const [completedStep4, setCompletedStep4] = useState(false)
   // Step 3
-  const [commutePlan, setCommutePlan] = useState<{totalTime:string;totalFare:number;legs:{mode:string;instruction:string;fare:number}[]}|null>(null)
+  const [commutePlan, setCommutePlan] = useState<{totalTime:string;totalFare:number;legs:{mode:string;instruction:string;fare:number}[];routeGeometry?:any}|null>(null)
   const [isPlanning, setIsPlanning] = useState(false)
+  const s3MapContainerRef = useRef<HTMLDivElement>(null)
+  const s3MapRef = useRef<any>(null)
 
   const filteredSuggestions = query.trim().length > 0 
     ? (needType === 'diagnosis' 
@@ -208,15 +246,53 @@ export default function BeforePage() {
 
   // ── Leaflet & Global Init ──
   useEffect(() => {
-    // Warm-up API ping to Gemini to prevent cold-starts during demo
     fetch('/api/health').catch(() => {})
-
     if (typeof window === 'undefined') return
     if (!document.getElementById('leaflet-css')) {
       const link = document.createElement('link'); link.id = 'leaflet-css'; link.rel = 'stylesheet'; link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link)
       const script = document.createElement('script'); script.id = 'leaflet-js'; script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; script.onload = () => initMap(); document.head.appendChild(script)
     } else if (window.L) { initMap() }
+    // Load Google Maps JS API for client-side DirectionsService is not available for this key
+    // The Leaflet+OSM map (free) is used instead for Step 3
   }, [])
+
+  // ── Step 3 Leaflet Map (OpenStreetMap, no API key needed) ──
+  useEffect(() => {
+    if (!commutePlan || !s3MapContainerRef.current || typeof window === 'undefined' || !window.L) return
+    // Destroy previous map instance
+    if (s3MapRef.current) { try { s3MapRef.current.remove() } catch(_){} s3MapRef.current = null }
+    const L = window.L
+    const map = L.map(s3MapContainerRef.current, { scrollWheelZoom: false, zoomControl: true })
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 18,
+    }).addTo(map)
+    const bounds: [number,number][] = []
+    // Origin marker
+    if (userLat && userLng) {
+      L.circleMarker([userLat, userLng], { radius: 10, color: '#fff', fillColor: 'var(--primary)', fillOpacity: 1, weight: 3 })
+        .addTo(map).bindPopup('<strong>Your Location</strong>')
+      bounds.push([userLat, userLng])
+    }
+    // Destination marker
+    if (selectedFacility) {
+      const icon = L.divIcon({ html: `<div style="background:var(--primary);color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap">${selectedFacility.name.split(' ').slice(0,3).join(' ')}</div>`, className: '', iconAnchor: [0, 0] })
+      L.marker([selectedFacility.lat, selectedFacility.lng], { icon })
+        .addTo(map).bindPopup(`<strong>${selectedFacility.name}</strong><br>${selectedFacility.address}`)
+      bounds.push([selectedFacility.lat, selectedFacility.lng])
+    }
+    // Route polyline from OSRM geometry
+    if (commutePlan.routeGeometry?.coordinates?.length) {
+      const coords: [number,number][] = commutePlan.routeGeometry.coordinates.map(([lng, lat]: [number,number]) => [lat, lng])
+      L.polyline(coords, { color: 'var(--primary)', weight: 5, opacity: 0.85, lineJoin: 'round' }).addTo(map)
+      map.fitBounds(L.polyline(coords).getBounds(), { padding: [36, 36] })
+    } else if (bounds.length >= 2) {
+      map.fitBounds(bounds, { padding: [40, 40] })
+    } else if (bounds.length === 1) {
+      map.setView(bounds[0], 14)
+    }
+    s3MapRef.current = map
+  }, [commutePlan])
 
   const initMap = useCallback(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -338,8 +414,9 @@ export default function BeforePage() {
     setShowGastosPrompt(false); setCompletedStep2(true); setIsPlanning(true)
     setTimeout(() => step3Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200)
     try {
+      // Use server-side route: Google Maps Directions API → LTFRB haversine fallback
       const res = await fetch('/api/commute', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ originLat: userLat, originLng: userLng, destinationLat: selectedFacility.lat, destinationLng: selectedFacility.lng, facilityName: selectedFacility.name }) })
-      const data = await res.json(); setCommutePlan(data)
+      setCommutePlan(await res.json())
     } catch (e) { console.error(e) } finally { setIsPlanning(false) }
   }
 
@@ -482,7 +559,7 @@ export default function BeforePage() {
                   <div className="bfr-prompt-card">
                     <h4>{selectedFacility.name}</h4>
                     <p>{selectedFacility.address}</p>
-                    <span className="bfr-prompt-r">{((selectedFacility as any)._dist || (userLat && userLng ? haversineKm(userLat, userLng, selectedFacility.lat, selectedFacility.lng) : 0)).toFixed?.(1) || '?'} km · {selectedFacility.type} · {selectedFacility.services.slice(0,3).join(', ')}</span>
+                    <span className="bfr-prompt-r">{((selectedFacility as any)._dist || (userLat && userLng ? haversineKm(userLat, userLng, selectedFacility.lat, selectedFacility.lng) : 0)).toFixed?.(1) || '?'} km · {getFacilityTagline(selectedFacility, classification?.class)}</span>
                     <div className="bfr-prompt-btns">
                       <button className="bfr-pri-btn" onClick={handleGoToStep3}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/></svg>Compute Travel & Gastos</button>
                       <button className="bfr-ghost-btn" onClick={()=>setShowGastosPrompt(false)}>Cancel</button>
@@ -518,7 +595,7 @@ export default function BeforePage() {
         <div className="bfr-main">
           <span className="bfr-tag">Commute & Expenses</span>
           <h1 className="bfr-h1">Travel & Gastos</h1>
-          <p className="bfr-p">AI-generated transit plan grounded in official LTFRB fare matrices.</p>
+          <p className="bfr-p">Route via OpenStreetMap · Fare based on official LTFRB 2024 matrices.</p>
           {isPlanning&&(<div className="bfr-loading"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" style={{animation:'bspin 1s linear infinite'}}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><strong>Analyzing Manila Transit</strong><span>Computing fare matrices…</span></div>)}
           {!isPlanning&&commutePlan&&selectedFacility&&(
             <div className="bfr-s3-grid fade-in">
@@ -565,16 +642,13 @@ export default function BeforePage() {
                 <div style={{padding:'16px 22px'}}><button className="bfr-pri-btn" style={{width:'100%',justifyContent:'center',padding:'12px',fontSize:'14px'}} onClick={() => { setCompletedStep3(true); setTimeout(() => step4Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>Proceed to Document Checklist <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button></div>
               </div>
 
-              {/* Right: Route Map */}
+              {/* Right: Leaflet + OpenStreetMap route (free, no API key) */}
               <div className="bfr-route-map-area">
-                <iframe
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0, borderRadius: '12px' }}
-                  referrerPolicy="no-referrer-when-downgrade"
-                  src={`https://www.google.com/maps/embed/v1/directions?key=${process.env.NEXT_PUBLIC_MAPS_API_KEY || ''}&origin=${userLat},${userLng}&destination=${selectedFacility.lat},${selectedFacility.lng}&mode=transit`}
-                  allowFullScreen>
-                </iframe>
+                <div ref={s3MapContainerRef} style={{ width: '100%', height: '100%', borderRadius: '12px', minHeight: '400px' }} />
+                <div style={{ padding: '8px 12px', fontSize: '11px', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
+                  Mapa mula sa <a href="https://www.openstreetmap.org" target="_blank" rel="noopener" style={{color:'var(--primary)'}}>OpenStreetMap</a> · Libreng gamitin
+                </div>
               </div>
             </div>
           )}
@@ -582,9 +656,9 @@ export default function BeforePage() {
       </section>
 
       {/* ═══════ STEP 4 ═══════ */}
-      <section className={`bfr-sec ${completedStep3?'':'locked'}`} ref={step4Ref}>
+      <section className={`bfr-sec ${completedStep3?'':'locked'}`} ref={step4Ref} style={{height:'auto',minHeight:'100vh',overflowY:'auto',paddingBottom:'60px'}}>
         <div className="bfr-num-col"><div className="bfr-circ active">4</div></div>
-        <div className="bfr-main">
+        <div className="bfr-main" style={{overflow:'visible'}}>
           <span className="bfr-tag">Preparation</span>
           <h1 className="bfr-h1">Requirements Checklist</h1>
           <p className="bfr-p">Prepare these documents and requirements to ensure a smooth, free, or discounted service transaction.</p>
@@ -593,7 +667,73 @@ export default function BeforePage() {
             isPGH={Boolean(selectedFacility?.id === 'h4' || selectedFacility?.name.includes('Philippine General'))}
             userLat={userLat}
             userLng={userLng}
+            commutePlan={commutePlan}
           />
+
+          <div style={{ marginTop: '24px' }}>
+            <button className="bfr-pri-btn" style={{ padding: '12px 24px', fontSize: '14px' }} onClick={() => { setCompletedStep4(true); setTimeout(() => step5Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
+              Proceed to Time & Reality Check <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════ STEP 5 ═══════ */}
+      <section className={`bfr-sec ${completedStep4?'':'locked'}`} ref={step5Ref} style={{height:'auto',minHeight:'100vh',paddingBottom:'80px'}}>
+        <div className="bfr-num-col"><div className="bfr-circ active">5</div></div>
+        <div className="bfr-main">
+          <span className="bfr-tag">Reality Check</span>
+          <h1 className="bfr-h1">Time & Experience Estimations</h1>
+          
+          {selectedFacility && !(selectedFacility.id === 'h4' || selectedFacility.name.includes('Philippine General')) ? (
+            <div style={{ background: '#fff', border: '1.5px dashed var(--border)', borderRadius: '16px', padding: '40px', textAlign: 'center', marginTop: '20px' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--bg-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <svg width="28" height="28" fill="none" stroke="var(--primary)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px' }}>Upcoming Feature for {selectedFacility.name}</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', maxWidth: '400px', margin: '0 auto 24px', lineHeight: 1.6 }}>Wait time estimations and crowdsourced reality checks are currently under development and are only available for PGH at the moment.</p>
+              <button className="bfr-pri-btn" onClick={() => window.location.href = '#'}>Start My Journey <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+            </div>
+          ) : (
+            <div>
+              <p className="bfr-p">Based on your condition selection in Step 1 (<strong>{needType === 'emergency' ? 'Emergency' : needType === 'diagnosis' ? 'Diagnostics' : needType === 'medicine' ? 'Medicine' : 'Consultation'}</strong>), here are the realistic processing times and services you will likely queue for. Data is crowdsourced from Reddit and local patient communities.</p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px', marginTop: '20px' }}>
+                {PGH_ESTIMATES.filter(e => e.needTypes.includes('all') || e.needTypes.includes(needType)).map((e, i) => (
+                  <div key={i} style={{ background: '#fff', borderRadius: '16px', border: '1.5px solid var(--border-light)', overflow: 'hidden' }}>
+                    <div style={{ background: 'var(--primary-light)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>{e.service}</h4>
+                      <div style={{ background: '#fff', color: 'var(--primary)', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 800 }}>{e.estWait} WAIT</div>
+                    </div>
+                    <div style={{ padding: '20px' }}>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                        <div style={{ flex: 1, background: 'var(--bg-muted)', padding: '10px 14px', borderRadius: '10px' }}>
+                          <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: '#888', fontWeight: 700, marginBottom: '2px' }}>BEST TIME TO ARRIVE</span>
+                          <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{e.bestTime}</strong>
+                        </div>
+                      </div>
+                      
+                      <div style={{ background: '#f8f9fa', borderLeft: '3px solid var(--primary)', padding: '12px 14px', borderRadius: '0 8px 8px 0', marginBottom: '16px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Source: {e.source}
+                        </span>
+                        <p style={{ margin: 0, fontSize: '13px', fontStyle: 'italic', color: '#555', lineHeight: 1.5 }}>{e.redditQuote}</p>
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase' }}>Expert Tip:</span>
+                        <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{e.tip}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: '32px', textAlign: 'center' }}>
+                 <button className="bfr-pri-btn" style={{ padding: '14px 32px', fontSize: '15px' }} onClick={() => window.location.href = '#'}>I'm Ready — Transition to Hospital View <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
