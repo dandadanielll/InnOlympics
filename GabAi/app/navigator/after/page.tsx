@@ -88,7 +88,7 @@ export default function AfterPage() {
   }
 
   // Visit Recap formatting
-  const visitFacilityName = encounter?.carePlan?.recommendedFacility || 'Hindi natukoy ang facility'
+  const visitFacilityName = encounter?.selectedFacility?.name || encounter?.carePlan?.recommendedFacility || 'Hindi natukoy ang facility'
   const [visitDateStr, setVisitDateStr] = useState('Kamakailan')
   const [isMounted, setIsMounted] = useState(false)
 

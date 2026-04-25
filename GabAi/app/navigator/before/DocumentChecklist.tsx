@@ -252,16 +252,30 @@ function MiniOSMMap({ userLat, userLng, destQuery, destName }: { userLat: number
 }
 
 export function DocumentChecklist({
-  isPGH, userLat, userLng, commutePlan
+  isPGH, userLat, userLng, commutePlan, initialCheckedDocs, onChecklistChange
 }: {
   isPGH: boolean
   userLat: number | null
   userLng: number | null
   commutePlan?: CommutePlan | null
+  initialCheckedDocs?: Record<string, boolean>
+  onChecklistChange?: (checked: Record<string, boolean>) => void
 }) {
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null)
-  const [checkedDocs, setCheckedDocs] = useState<Record<string, boolean>>({})
+  const [checkedDocs, setCheckedDocs] = useState<Record<string, boolean>>(initialCheckedDocs || {})
   const [showMap, setShowMap] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (initialCheckedDocs) {
+      setCheckedDocs(initialCheckedDocs)
+    }
+  }, [initialCheckedDocs])
+
+  const handleToggle = (id: string) => {
+    const next = { ...checkedDocs, [id]: !checkedDocs[id] }
+    setCheckedDocs(next)
+    onChecklistChange?.(next)
+  }
 
   const docs = isPGH ? PGH_DOCS : GENERAL_DOCS
   const checkedCount = docs.filter(d => checkedDocs[d.id]).length
@@ -302,7 +316,7 @@ export function DocumentChecklist({
                 <input
                   type="checkbox"
                   checked={isChecked || false}
-                  onChange={() => setCheckedDocs(p => ({ ...p, [d.id]: !p[d.id] }))}
+                  onChange={() => handleToggle(d.id)}
                   onClick={e => e.stopPropagation()}
                   style={{ width: '20px', height: '20px', accentColor: 'var(--primary)', cursor: 'pointer', flexShrink: 0 }}
                 />
