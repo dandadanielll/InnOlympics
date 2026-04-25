@@ -167,7 +167,7 @@ export default function BeforePage() {
       if (encounter.needType) setNeedType(encounter.needType)
       if (encounter.symptoms) setQuery(encounter.symptoms)
       if (encounter.classification) setClassification(encounter.classification as any)
-      
+
       if (encounter.userLocation) {
         setUserLat(encounter.userLocation.lat)
         setUserLng(encounter.userLocation.lng)
@@ -745,64 +745,64 @@ export default function BeforePage() {
           <h1 className="bfr-h1">Time & Experience Estimations</h1>
 
           {(() => {
-            const facilityEstimates = REALITY_ESTIMATES.filter(e => 
-              e.facilityId === selectedFacility?.id || 
+            const facilityEstimates = REALITY_ESTIMATES.filter(e =>
+              e.facilityId === selectedFacility?.id ||
               (selectedFacility?.isBHC && e.facilityId === 'bhc') ||
               (e.facilityId === 'all')
             ).filter(e => e.needTypes.includes('all') || e.needTypes.includes(needType || ''))
 
             if (!selectedFacility || facilityEstimates.length === 0) {
               return (
-            <div style={{ background: '#fff', border: '1.5px dashed var(--border)', borderRadius: '16px', padding: '40px', textAlign: 'center', marginTop: '20px' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--bg-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                <svg width="28" height="28" fill="none" stroke="var(--primary)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-              </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px' }}>Upcoming Feature for {selectedFacility?.name || 'this facility'}</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', maxWidth: '400px', margin: '0 auto 24px', lineHeight: 1.6 }}>Wait time estimations and crowdsourced reality checks are currently under development for this specific location.</p>
-              <button className="bfr-pri-btn" onClick={handleStartJourney}>Start My Journey <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg></button>
+                <div style={{ background: '#fff', border: '1.5px dashed var(--border)', borderRadius: '16px', padding: '40px', textAlign: 'center', marginTop: '20px' }}>
+                  <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--bg-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                    <svg width="28" height="28" fill="none" stroke="var(--primary)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                  </div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px' }}>Upcoming Feature for {selectedFacility?.name || 'this facility'}</h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', maxWidth: '400px', margin: '0 auto 24px', lineHeight: 1.6 }}>Wait time estimations and crowdsourced reality checks are currently under development for this specific location.</p>
+                  <button className="bfr-pri-btn" onClick={handleStartJourney}>Start My Journey <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg></button>
                 </div>
               )
             }
 
             return (
-            <div>
-              <p className="bfr-p" style={{ maxWidth: 'none' }}>Based on your selection for <strong>{selectedFacility.name}</strong>, here are the realistic processing times and services you will likely queue for.<br />Data is crowdsourced from Reddit and local patient communities.</p>
+              <div>
+                <p className="bfr-p" style={{ maxWidth: 'none' }}>Based on your selection for <strong>{selectedFacility.name}</strong>, here are the realistic processing times and services you will likely queue for.<br />Data is crowdsourced from Reddit and local patient communities.</p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '24px', marginTop: '32px' }}>
-                {facilityEstimates.map((e, i) => (
-                  <div key={i} style={{ background: '#fff', borderRadius: '16px', border: '1.5px solid var(--border-light)', overflow: 'hidden' }}>
-                    <div style={{ background: 'var(--primary-light)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>{e.service}</h4>
-                      <div style={{ background: '#fff', color: 'var(--primary)', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 800 }}>{e.estWait} WAIT</div>
-                    </div>
-                    <div style={{ padding: '20px' }}>
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                        <div style={{ flex: 1, background: 'var(--bg-muted)', padding: '10px 14px', borderRadius: '10px' }}>
-                          <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: '#888', fontWeight: 700, marginBottom: '2px' }}>BEST TIME TO ARRIVE</span>
-                          <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{e.bestTime}</strong>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '24px', marginTop: '32px' }}>
+                  {facilityEstimates.map((e, i) => (
+                    <div key={i} style={{ background: '#fff', borderRadius: '16px', border: '1.5px solid var(--border-light)', overflow: 'hidden' }}>
+                      <div style={{ background: 'var(--primary-light)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>{e.service}</h4>
+                        <div style={{ background: '#fff', color: 'var(--primary)', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 800 }}>{e.estWait} WAIT</div>
+                      </div>
+                      <div style={{ padding: '20px' }}>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                          <div style={{ flex: 1, background: 'var(--bg-muted)', padding: '10px 14px', borderRadius: '10px' }}>
+                            <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: '#888', fontWeight: 700, marginBottom: '2px' }}>BEST TIME TO ARRIVE</span>
+                            <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{e.bestTime}</strong>
+                          </div>
+                        </div>
+
+                        <div style={{ background: '#f8f9fa', borderLeft: '3px solid var(--primary)', padding: '12px 14px', borderRadius: '0 8px 8px 0', marginBottom: '16px' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg> Source: {e.source}
+                          </span>
+                          <p style={{ margin: 0, fontSize: '13px', fontStyle: 'italic', color: '#555', lineHeight: 1.5 }}>{e.redditQuote}</p>
+                        </div>
+
+                        <div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase' }}>Expert Tip:</span>
+                          <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{e.tip}</p>
                         </div>
                       </div>
-
-                      <div style={{ background: '#f8f9fa', borderLeft: '3px solid var(--primary)', padding: '12px 14px', borderRadius: '0 8px 8px 0', marginBottom: '16px' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg> Source: {e.source}
-                        </span>
-                        <p style={{ margin: 0, fontSize: '13px', fontStyle: 'italic', color: '#555', lineHeight: 1.5 }}>{e.redditQuote}</p>
-                      </div>
-
-                      <div>
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase' }}>Expert Tip:</span>
-                        <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{e.tip}</p>
-                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
 
-              <div style={{ marginTop: '32px', textAlign: 'center' }}>
-                <button className="bfr-pri-btn" style={{ padding: '14px 32px', fontSize: '15px' }} onClick={handleStartJourney}>I'm Ready — Transition to Hospital View <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg></button>
+                <div style={{ marginTop: '32px', textAlign: 'center' }}>
+                  <button className="bfr-pri-btn" style={{ padding: '14px 32px', fontSize: '15px' }} onClick={handleStartJourney}>I'm Ready — Transition to Hospital View <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg></button>
+                </div>
               </div>
-            </div>
             )
           })()}
         </div>
