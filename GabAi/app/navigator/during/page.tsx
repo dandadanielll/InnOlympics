@@ -80,7 +80,7 @@ export default function DuringPage() {
                 </svg>
               </button>
               <h3 className="text-h3" style={{ marginBottom: '8px' }}>Push to Listen</h3>
-              <p className="text-sm text-secondary">GabAi will securely transcribe the consult and extract key medical advice.</p>
+              <p className="text-sm text-secondary">GabAI will securely transcribe the consult and extract key medical advice.</p>
             </div>
           </div>
 

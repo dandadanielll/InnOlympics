@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-const WHATSAPP_TEXT = `*VISIT SUMMARY — GabAi*
+const WHATSAPP_TEXT = `*VISIT SUMMARY — GabAI*
 Date: April 25, 2026
 Facility: QC BHC
 
@@ -30,7 +30,7 @@ export default function AfterPage() {
         <div className="section-eyebrow" style={{ marginBottom: '8px' }}>Phase 3 · Uwi Ka Na</div>
         <h1 className="text-h1" style={{ marginBottom: '16px' }}>Post-Visit & Follow-up</h1>
         <p className="text-body text-secondary" style={{ maxWidth: '600px' }}>
-          Share your visit summary with family, log your experience to help the community, and let GabAi track your recovery and remember this encounter for next time.
+          Share your visit summary with family, log your experience to help the community, and let GabAI track your recovery and remember this encounter for next time.
         </p>
       </div>
 
@@ -72,7 +72,7 @@ export default function AfterPage() {
         <div className="card" style={{ maxWidth: '700px' }}>
           <div className="card-body">
             <p className="text-sm text-secondary" style={{ marginBottom: '24px' }}>
-              How is the patient doing after the visit? GabAi will evaluate if you need to return sooner.
+              How is the patient doing after the visit? GabAI will evaluate if you need to return sooner.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
               {[
@@ -128,7 +128,7 @@ export default function AfterPage() {
             ) : (
               <div style={{ textAlign: 'center', padding: '24px' }}>
                 <h3 className="text-h3" style={{ color: 'var(--success)', marginBottom: '8px' }}>Thank you.</h3>
-                <p className="text-sm text-muted">Your log was recorded anonymously via GabAi.</p>
+                <p className="text-sm text-muted">Your log was recorded anonymously via GabAI.</p>
               </div>
             )}
           </div>
