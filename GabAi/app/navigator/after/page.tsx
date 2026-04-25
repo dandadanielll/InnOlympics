@@ -140,82 +140,129 @@ export default function AfterPage() {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .bfr{margin:-48px}
-        .phase-sec{height:100vh;display:flex;padding:40px 48px;gap:24px;box-sizing:border-box;transition:opacity .4s,filter .4s;overflow:hidden}
-        .phase-sec.locked{opacity:.15;pointer-events:none;filter:blur(3px)}
-        .phase-num-col{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:44px;padding-top:2px}
-        .phase-circ{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;border:2px solid var(--border);color:var(--text-muted);background:#fff;transition:all .35s;flex-shrink:0}
-        .phase-circ.active{background:var(--text-primary);border-color:var(--text-primary);color:#fff}
-        .phase-circ.done{background:var(--primary);border-color:var(--primary);color:#fff}
-        .phase-line{flex:1;width:2px;background:var(--border-light);margin-top:10px;transition:background .4s}
-        .phase-line.filled{background:var(--primary)}
-        .phase-main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
-        .phase-tag{display:inline-flex;align-items:center;gap:6px;font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--primary);background:var(--primary-light);padding:5px 14px;border-radius:20px;width:fit-content;margin-bottom:14px}
-        .phase-h1{font-family:'Inter',-apple-system,sans-serif;font-size:2.5rem;font-weight:800;color:var(--text-primary);margin:0 0 10px;line-height:1.1;letter-spacing:-.03em}
-        .phase-p{font-size:.9375rem;color:var(--text-secondary);line-height:1.6;margin:0 0 28px;max-width:560px}
-        .phase-main-scrollable{flex:1;overflow-y:auto;padding-right:8px;padding-bottom:40px}
+        .bfr{margin:-120px -48px -48px; position:relative; overflow:visible !important}
+        .phase-sec{display:flex;flex-direction:column;min-height:100vh;padding:160px 48px 120px;box-sizing:border-box;transition:opacity .4s,filter .4s;border-bottom:1px solid var(--border-light);overflow:visible !important;align-items:center}
+        .phase-main{flex:1;min-width:0;display:flex;flex-direction:column;max-width:1040px;margin:0 auto;width:100%;overflow:visible !important;align-items:center;text-align:center}
+        .phase-h1{font-family:'Outfit',sans-serif;font-size:3.5rem;font-weight:800;color:var(--text-primary);margin:0 0 12px;line-height:1.05;letter-spacing:-.04em}
+        .phase-p{font-size:.9375rem;color:var(--text-secondary);line-height:1.6;margin:0 0 28px;max-width:800px}
+        .phase-main-content{flex:1;padding-bottom:40px;overflow:visible !important;display:flex;flex-direction:column;align-items:center;width:100%}
         .phase-pri-btn{display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:#fff;border:none;border-radius:40px;padding:9px 18px;font-weight:700;font-size:.6875rem;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
         .phase-pri-btn:hover{background:var(--primary-hover)}.phase-pri-btn:disabled{opacity:.35;cursor:not-allowed}
       ` }} />
 
       {/* STEP 1: VISIT RECAP */}
       <section className="phase-sec" ref={step1Ref}>
-        <div className="phase-num-col">
-          <div className="phase-circ active">1</div>
-          <div className="phase-line filled" />
-        </div>
         <div className="phase-main">
-          <span className="phase-tag">Recap</span>
           <h1 className="phase-h1">Buod ng Iyong Bisita</h1>
           <p className="phase-p">Suriin ang kabuuan ng iyong check-up bago tayo pumunta sa mga susunod na hakbang.</p>
-          <div className="phase-main-scrollable" style={{ paddingBottom: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div className="card fade-in-up" style={{ width: '100%', maxWidth: '700px', borderTop: '4px solid var(--primary)', background: 'var(--bg-base)', padding: '24px' }}>
+          <div className="phase-main-content">
+            <div className="card fade-in-up" style={{ width: '100%', maxWidth: '800px', borderTop: '6px solid var(--primary)', background: 'var(--bg-base)', padding: '32px', boxShadow: '0 12px 40px rgba(0,0,0,0.08)', overflow: 'visible', height: 'auto' }}>
               {mountedEncounter ? (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <div className="text-xs tracking-wide uppercase" style={{ color: 'var(--primary)', fontWeight: 600 }}>Buod ng Iyong Bisita</div>
-                    <div className="text-xs text-muted">{visitDateStr}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                  {/* TOP GRID */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-light)', paddingBottom: '20px' }}>
+                    <div>
+                      <div className="text-xs tracking-wide uppercase" style={{ color: 'var(--primary)', fontWeight: 700, marginBottom: '4px' }}>Status ng Encounter</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: mountedEncounter.phase === 'complete' ? 'var(--success)' : 'var(--warning)' }}>
+                        {mountedEncounter.phase === 'complete' ? 'Tapos na ang Bisita' : 'Kasalukuyang Aktibo'}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div className="text-xs text-muted uppercase" style={{ fontWeight: 600, marginBottom: '4px' }}>Petsa ng Check-up</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>{visitDateStr}</div>
+                    </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+                  {/* MAIN SUMMARY DATA */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
                     <div>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
-                      </svg>
-                      <div className="text-h3" style={{ color: 'var(--text-primary)', fontWeight: 700, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {visitFacilityName}
+                      <div className="text-xs tracking-wide uppercase" style={{ color: 'var(--text-muted)', fontWeight: 700, marginBottom: '8px' }}>Pasilidad</div>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'color-mix(in srgb, var(--primary) 10%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+                          </svg>
+                        </div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                          {visitFacilityName}
+                        </div>
                       </div>
-                      <div className="text-xs text-muted">Pinuntahang Pasilidad</div>
                     </div>
-                    <div>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+
+                    {mountedEncounter.classification && mountedEncounter.needType === 'diagnosis' && (
+                      <div>
+                        <div className="text-xs tracking-wide uppercase" style={{ color: 'var(--text-muted)', fontWeight: 700, marginBottom: '8px' }}>Diagnosis / Classification</div>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'color-mix(in srgb, var(--warning) 10%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                            </svg>
+                          </div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                            {mountedEncounter.classification.title}
+                            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginTop: '2px' }}>Risk Level: {mountedEncounter.classification.risk.toUpperCase()}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* MEDICINES SECTION */}
+                  <div style={{ background: 'var(--bg-muted)', borderRadius: '16px', padding: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M10.5 20.5 19 12a4.95 4.95 0 1 0-7-7L3.5 13.5a4.95 4.95 0 1 0 7 7Z" /><path d="m8.5 8.5 7 7" />
                       </svg>
-                      <div className="text-h3" style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
-                        {mountedEncounter.toRemember?.length ?? 0}
-                      </div>
-                      <div className="text-xs text-muted">Gamot na Tandaan</div>
+                      <div className="text-sm uppercase" style={{ fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.05em' }}>Mga Gamot at Bilin na Dapat Tandaan</div>
                     </div>
-                    <div>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
-                        <rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
-                      </svg>
-                      <div className="text-h3" style={{ color: mountedEncounter.phase === 'complete' ? 'var(--success)' : 'var(--warning)', fontWeight: 700 }}>
-                        {mountedEncounter.phase === 'complete' ? 'Tapos' : 'Aktibo'}
+                    
+                    {mountedEncounter.toRemember && mountedEncounter.toRemember.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {mountedEncounter.toRemember.map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', background: 'var(--bg-base)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                            <div style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '1rem' }}>•</div>
+                            <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>{item}</div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="text-xs text-muted">Status ng Encounter</div>
-                    </div>
+                    ) : (
+                      <div className="text-sm text-muted" style={{ fontStyle: 'italic' }}>Walang nakatalang partikular na gamot o bilin.</div>
+                    )}
+                  </div>
+
+                  {/* DOCUMENT FINDINGS */}
+                  {mountedEncounter.documentScans && mountedEncounter.documentScans.length > 0 && (
                     <div>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+                      <div className="text-sm uppercase" style={{ fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.05em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
+                        </svg>
+                        Medical Findings mula sa Scans
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        {mountedEncounter.documentScans.map((scan, idx) => (
+                          <div key={idx} style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px' }}>
+                            <div className="text-xs text-muted" style={{ marginBottom: '8px' }}>Scan #{idx + 1}</div>
+                            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{scan.explanation}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* REFERRAL ALERT IF ANY */}
+                  {mountedEncounter.referralTriggered && (
+                    <div style={{ display: 'flex', gap: '16px', background: 'color-mix(in srgb, var(--warning) 8%, transparent)', padding: '20px', borderRadius: '16px', border: '1px solid var(--warning)' }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                         <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" x2="4" y1="22" y2="15" />
                       </svg>
-                      <div className="text-h3" style={{ color: mountedEncounter.referralTriggered ? 'var(--warning)' : 'var(--text-muted)', fontWeight: 700 }}>
-                        {mountedEncounter.referralTriggered ? 'May Referral' : 'Wala'}
+                      <div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>May Inirekomendang Referral</div>
+                        <div className="text-sm" style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>Sumangguni sa susunod na seksyon para sa detalye ng iyong referral.</div>
                       </div>
-                      <div className="text-xs text-muted">Referral</div>
                     </div>
-                  </div>
-                </>
+                  )}
+                </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '16px 0' }}>
                   <p className="text-body text-secondary" style={{ marginBottom: '16px' }}>Walang encounter data. Magsimula sa Before Phase para mag-log ng bagong bisita.</p>
@@ -223,29 +270,19 @@ export default function AfterPage() {
                 </div>
               )}
             </div>
-
-            <button className="phase-pri-btn" style={{ marginTop: '24px', alignSelf: 'center' }} onClick={() => { setCompletedStep1(true); setTimeout(() => step2Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
-              Ipagpatuloy <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-            </button>
           </div>
         </div>
       </section>
 
       {/* STEP 2: REFERRAL COMPANION */}
-      <section className={`phase-sec ${completedStep1 ? '' : 'locked'}`} ref={step2Ref}>
-        <div className="phase-num-col">
-          <div className={`phase-circ ${completedStep1 ? 'active' : ''}`}>2</div>
-          <div className={`phase-line ${completedStep2 ? 'filled' : ''}`} />
-        </div>
+      <section className="phase-sec">
         <div className="phase-main">
-          <span className="phase-tag">Referral Companion</span>
           <h1 className="phase-h1">Susunod na Hakbang</h1>
           <p className="phase-p">Kung ikaw ay nirefer sa ibang pasilidad o laboratoryo, ito ang iyong gabay para sa susunod na hakbang.</p>
-          <div className="phase-main-scrollable" style={{ paddingBottom: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-
-            {!mountedEncounter || !mountedEncounter.referralTriggered ? (
+          <div className="phase-main-content">
+            {!mountedEncounter || (!mountedEncounter.referralTriggered && mountedEncounter.needType !== 'diagnosis') ? (
               <div className="card" style={{ width: '100%', maxWidth: '700px', background: 'var(--bg-muted)', border: '1px dashed var(--border)', opacity: 0.6 }}>
-                <div className="card-body" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div className="card-body" style={{ display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
                   </svg>
@@ -256,81 +293,72 @@ export default function AfterPage() {
                 </div>
               </div>
             ) : (
-              <div className="card fade-in-up" style={{ width: '100%', maxWidth: '700px', borderTop: '4px solid var(--warning)', background: 'var(--bg-base)', animation: 'borderPulse 1s ease 2, fadeInUp 300ms ease-out forwards' }}>
-                <div className="card-body">
-                  <div style={{ display: 'inline-flex', background: 'var(--warning)', color: '#000', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700 }}>
-                    May Referral ang Iyong Doktor
+              <div 
+                className="card fade-in-up" 
+                style={{ 
+                  width: '100%', 
+                  maxWidth: '600px', 
+                  border: '2px solid var(--warning)', 
+                  background: 'var(--bg-base)', 
+                  cursor: 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  padding: '0'
+                }}
+                onClick={() => handleStartNew(true)}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'translateY(-8px)'
+                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(176, 124, 57, 0.15)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'var(--shadow-soft)'
+                }}
+              >
+                <div style={{ background: 'var(--warning)', color: '#fff', padding: '12px', textAlign: 'center', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                  Inirerekomendang Susunod na Hakbang
+                </div>
+                <div className="card-body" style={{ padding: '40px', textAlign: 'center' }}>
+                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--warning-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                      <path d="M12 11h4" />
+                      <path d="M12 16h4" />
+                      <path d="M8 11h.01" />
+                      <path d="M8 16h.01" />
+                    </svg>
                   </div>
-                  <p className="text-sm text-secondary" style={{ marginTop: '12px' }}>
-                    Binigyan ka ng referral ng iyong doktor. Ang susunod na hakbang ay isa pang encounter — at tutulungan ka ng GabAi sa buong proseso.
+                  
+                  <div className="text-xs uppercase" style={{ color: 'var(--text-muted)', fontWeight: 700, marginBottom: '8px' }}>Serbisyong Kakaingailanganin:</div>
+                  <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 16px', lineHeight: 1.2 }}>
+                    {mountedEncounter.classification?.title || 'Specialist Consultation'}
+                  </h2>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)', marginBottom: '32px', maxWidth: '400px', margin: '0 auto 32px' }}>
+                    I-click ang card na ito para simulan ang paghahanap ng pinakamalapit na pasilidad para sa iyong referral.
                   </p>
-                  <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '0' }}>
-                    {/* Step 1 */}
-                    <div style={{ display: 'flex', gap: '16px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>1</div>
-                        <div style={{ width: '2px', height: '32px', background: 'var(--border)', margin: '4px auto' }} />
-                      </div>
-                      <div style={{ paddingBottom: '16px' }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--text-primary)', marginBottom: '4px' }}>Kumuha ng Referral Form</div>
-                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>Humingi ng referral slip sa doktor mo bago umalis. Kailangan ito para matanggap ka sa susunod na pasilidad.</div>
-                      </div>
-                    </div>
-                    {/* Step 2 */}
-                    <div style={{ display: 'flex', gap: '16px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>2</div>
-                        <div style={{ width: '2px', height: '32px', background: 'var(--border)', margin: '4px auto' }} />
-                      </div>
-                      <div style={{ paddingBottom: '16px' }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--text-primary)', marginBottom: '4px' }}>Alamin ang Susunod na Pasilidad</div>
-                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>I-click ang button sa ibaba para simulan ang bagong Before Phase para sa iyong referral na pasilidad o laboratoryo.</div>
-                      </div>
-                    </div>
-                    {/* Step 3 */}
-                    <div style={{ display: 'flex', gap: '16px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>3</div>
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--text-primary)', marginBottom: '4px' }}>Dalhin ang Iyong Alaala Ko</div>
-                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>Awtomatikong dadalhin ng GabAi ang kasaysayan ng iyong encounter para sa susunod mong bisita.</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <button className="btn btn-primary" style={{ flex: '1 1 auto' }} onClick={() => handleStartNew(true)}>
-                      Simulan ang Bagong Encounter &rarr;
-                    </button>
+                  
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--warning)', fontWeight: 700, fontSize: '0.875rem' }}>
+                    SIMULAN ANG ENCOUNTER <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                   </div>
                 </div>
               </div>
             )}
-
-            <button className="phase-pri-btn" style={{ marginTop: '24px', alignSelf: 'center' }} onClick={() => { setCompletedStep2(true); setTimeout(() => step3Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
-              Ipagpatuloy <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-            </button>
           </div>
         </div>
       </section>
 
       {/* STEP 3: FOLLOW-UP INTELLIGENCE */}
-      <section className={`phase-sec ${completedStep2 ? '' : 'locked'}`} ref={step3Ref}>
-        <div className="phase-num-col">
-          <div className={`phase-circ ${completedStep2 ? 'active' : ''}`}>3</div>
-          <div className={`phase-line ${completedStep3 ? 'filled' : ''}`} />
-        </div>
+      <section className="phase-sec">
         <div className="phase-main">
-          <span className="phase-tag">Follow-up Intelligence</span>
           <h1 className="phase-h1">Okay Ka Pa Ba?</h1>
           <p className="phase-p">
             {mountedEncounter?.symptoms
               ? `Kumusta ang lagay mo mula sa iyong bisita para sa "${mountedEncounter.symptoms.length > 60 ? mountedEncounter.symptoms.substring(0, 60) + '...' : mountedEncounter.symptoms}"?`
               : 'I-update ang iyong lagay para masubaybayan ng GabAi ang iyong pagbabago.'}
           </p>
-          <div className="phase-main-scrollable" style={{ paddingBottom: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div className="phase-main-content">
             <div className="card" style={{ width: '100%', maxWidth: '700px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
               {!isChatStarted && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {[
@@ -450,26 +478,16 @@ export default function AfterPage() {
                 </div>
               ) : null}
             </div>
-
-            <button className="phase-pri-btn" style={{ marginTop: '24px', alignSelf: 'center' }} onClick={() => { setCompletedStep3(true); setTimeout(() => step4Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
-              Ipagpatuloy <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-            </button>
           </div>
         </div>
       </section>
 
       {/* STEP 4: COMMUNITY LOG */}
-      <section className={`phase-sec ${completedStep3 ? '' : 'locked'}`} ref={step4Ref}>
-        <div className="phase-num-col">
-          <div className={`phase-circ ${completedStep3 ? 'active' : ''}`}>4</div>
-          <div className={`phase-line ${completedStep4 ? 'filled' : ''}`} />
-        </div>
+      <section className="phase-sec">
         <div className="phase-main">
-          <span className="phase-tag">Para sa Komunidad</span>
           <h1 className="phase-h1">Community Experience Log</h1>
           <p className="phase-p">Ang iyong anonymous na feedback ay tumutulong sa mga susunod na pasyente at sa LGU para mapabuti ang serbisyo.</p>
-          <div className="phase-main-scrollable" style={{ paddingBottom: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-
+          <div className="phase-main-content">
             <div className="card" style={{ width: '100%', maxWidth: '700px' }}>
               <div className="card-body">
                 {!logDone ? (
@@ -630,24 +648,16 @@ export default function AfterPage() {
                 )}
               </div>
             </div>
-
-            <button className="phase-pri-btn" style={{ marginTop: '24px', alignSelf: 'center' }} onClick={() => { setCompletedStep4(true); setTimeout(() => step5Ref.current?.scrollIntoView({ behavior: 'smooth' }), 200) }}>
-              Ipagpatuloy <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-            </button>
           </div>
         </div>
       </section>
 
       {/* STEP 5: ALAALA KO (DONE) */}
-      <section className={`phase-sec ${completedStep4 ? '' : 'locked'}`} ref={step5Ref}>
-        <div className="phase-num-col">
-          <div className={`phase-circ ${completedStep4 ? 'active' : ''}`}>5</div>
-        </div>
+      <section className="phase-sec">
         <div className="phase-main">
-          <span className="phase-tag">Tapos Na</span>
           <h1 className="phase-h1">Saved to Alaala Ko</h1>
           <p className="phase-p">Ang encounter na ito ay naka-imbak sa iyong device. Awtomatikong gagamitin ng GabAi ang kasaysayang ito para mas maging handa ka sa susunod.</p>
-          <div className="phase-main-scrollable" style={{ paddingBottom: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div className="phase-main-content">
             <div className="card" style={{ width: '100%', maxWidth: '700px', background: 'var(--bg-dark)', border: 'none' }}>
               <div className="card-body">
                 <h3 className="text-h3" style={{ color: '#fff', marginBottom: '8px' }}>Saved to Alaala Ko</h3>
