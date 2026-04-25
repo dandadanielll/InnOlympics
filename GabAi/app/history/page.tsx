@@ -12,6 +12,7 @@ export default function AlaalaKoPage() {
   const [search, setSearch] = useState('')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [editForm, setEditForm] = useState<Partial<UserProfile>>({})
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -20,10 +21,7 @@ export default function AlaalaKoPage() {
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
     setEncounters(sorted)
-    
-    if (user) {
-      setEditForm(user)
-    }
+    if (user) setEditForm(user)
   }, [getAllEncounters, user])
 
   if (!mounted) return null
@@ -55,19 +53,18 @@ export default function AlaalaKoPage() {
     if (user) {
       setUser({ ...user, ...editForm } as UserProfile)
     } else {
-      setUser({ 
-        id: 'new-user', 
-        city: editForm.city || '', 
-        language: editForm.language || 'taglish', 
-        philHealth: editForm.philHealth || 'not-sure', 
-        onboardingComplete: true 
+      setUser({
+        id: 'new-user',
+        city: editForm.city || '',
+        language: editForm.language || 'taglish',
+        philHealth: editForm.philHealth || 'not-sure',
+        onboardingComplete: true
       } as UserProfile)
     }
     setIsEditingProfile(false)
   }
 
   const activeEncounters = encounters.filter(e => e.phase !== 'complete' || e.followUpStatus === 'flagged')
-  const pastEncounters = encounters.filter(e => e.phase === 'complete' && e.followUpStatus !== 'flagged')
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', paddingBottom: '64px' }}>
@@ -225,14 +222,11 @@ export default function AlaalaKoPage() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Active Encounters first, if any */}
-          {activeEncounters.length > 0 && !search && (
-             <div className="text-xs font-semibold text-muted" style={{ textTransform: 'uppercase', marginTop: '8px', letterSpacing: '0.05em' }}>Kasalukuyang Inaaksyunan</div>
-          )}
-          
           {filtered.map((e) => (
             <div key={e.id} className="card" style={{ borderLeft: e.phase !== 'complete' || e.followUpStatus === 'flagged' ? '4px solid var(--warning)' : 'none' }}>
               <div className="card-body">
+
+                {/* Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                   <div>
                     <div className="text-xs text-muted" style={{ marginBottom: '4px', fontWeight: 600 }}>
@@ -244,56 +238,132 @@ export default function AlaalaKoPage() {
                   </div>
                   <span className={`badge ${statusColor(e)}`}>{statusLabel(e)}</span>
                 </div>
-                
+
+                {/* Summary row */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', background: 'var(--bg-muted)', padding: '16px', borderRadius: 'var(--radius-md)' }}>
                   <div>
                     <div className="text-xs text-muted" style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                       Pasilidad
                     </div>
-                    <div className="text-sm" style={{ fontWeight: 600 }}>
-                      {e.carePlan?.recommendedFacility ?? 'Hindi pa natukoy'}
-                    </div>
+                    <div className="text-sm" style={{ fontWeight: 600 }}>{e.carePlan?.recommendedFacility ?? 'Hindi pa natukoy'}</div>
                   </div>
-                  
                   {e.toRemember && e.toRemember.length > 0 && (
                     <div>
                       <div className="text-xs text-muted" style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 20.5 19 12a4.95 4.95 0 1 0-7-7L3.5 13.5a4.95 4.95 0 1 0 7 7Z"></path><path d="m8.5 8.5 7 7"></path></svg>
-                        Mahiwagang Bilin (To Remember)
+                        Mga Bilin
                       </div>
-                      <div className="text-sm" style={{ fontWeight: 600 }}>
-                        {e.toRemember.length} items na naitala
-                      </div>
+                      <div className="text-sm" style={{ fontWeight: 600 }}>{e.toRemember.length} items na naitala</div>
                     </div>
                   )}
-
                   {e.referralTriggered && (
                     <div>
                       <div className="text-xs text-muted" style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 16 12 14 15 10 9 8 12 2 12"></polyline></svg>
                         Aksyon
                       </div>
-                      <div className="text-sm" style={{ fontWeight: 600, color: 'var(--warning)' }}>
-                        Nangangailangan ng Referral
-                      </div>
+                      <div className="text-sm" style={{ fontWeight: 600, color: 'var(--warning)' }}>Nangangailangan ng Referral</div>
                     </div>
                   )}
                 </div>
-                
-                <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
-                  <button className="btn btn-secondary" style={{ fontSize: '0.8125rem', padding: '6px 16px' }} onClick={() => {
-                     // In a real app, this would route to a detailed view of the specific encounter.
-                     // For demo purposes, we can navigate them back to the active phase if it's not complete.
-                     if (e.phase !== 'complete') {
-                       router.push(`/navigator/${e.phase}`)
-                     } else {
-                       alert('Ang buong detalye ng encounter na ito ay ilalabas sa susunod na update ng GabAi.')
-                     }
-                  }}>
-                    {e.phase !== 'complete' ? 'Ipagpatuloy ang Bisita \u2192' : 'Tingnan ang Detalye \u2192'}
+
+                {/* Expandable Detail Panel */}
+                {expandedId === e.id && (
+                  <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+
+                    {e.classification && (
+                      <div>
+                        <div className="text-xs text-muted" style={{ fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Klasipikasyon</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          <span style={{ background: 'var(--bg-muted)', padding: '4px 10px', borderRadius: '99px', fontSize: '0.8125rem', fontWeight: 600 }}>{e.classification.title}</span>
+                          <span style={{ background: 'var(--bg-muted)', padding: '4px 10px', borderRadius: '99px', fontSize: '0.8125rem' }}>{e.classification.class}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {e.carePlan && (
+                      <div>
+                        <div className="text-xs text-muted" style={{ fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Pasilidad</div>
+                        <div className="text-sm" style={{ fontWeight: 600 }}>{e.carePlan.recommendedFacility || 'Hindi pa natukoy'}</div>
+                        {e.carePlan.facilityAddress && (
+                          <div className="text-xs text-muted" style={{ marginTop: '2px' }}>{e.carePlan.facilityAddress}</div>
+                        )}
+                        {e.carePlan.commuteEstimate && (
+                          <div className="text-xs" style={{ marginTop: '4px', color: 'var(--text-secondary)' }}>🚌 {e.carePlan.commuteEstimate}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {e.toRemember && e.toRemember.length > 0 && (
+                      <div>
+                        <div className="text-xs text-muted" style={{ fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Mga Bilin ng Doktor</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {e.toRemember.map((item, i) => (
+                            <div key={i} style={{ background: 'var(--bg-muted)', padding: '8px 12px', borderRadius: 'var(--radius-md)', fontSize: '0.8125rem' }}>{item}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {e.documentScans && e.documentScans.length > 0 && (
+                      <div>
+                        <div className="text-xs text-muted" style={{ fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Mga Na-scan na Dokumento</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {e.documentScans.map((scan, i) => (
+                            <div key={i} style={{ background: 'var(--bg-muted)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: '0.8125rem' }}>
+                              {scan.explanation || 'Walang paliwanag na naitala'}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {e.encounterLog && e.encounterLog.length > 0 && (
+                      <div>
+                        <div className="text-xs text-muted" style={{ fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Encounter Log</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
+                          {e.encounterLog.map((log, i) => (
+                            <div key={i} style={{ background: 'var(--bg-muted)', padding: '8px 12px', borderRadius: 'var(--radius-md)', fontSize: '0.8125rem' }}>
+                              <span style={{ fontWeight: 700, color: 'var(--primary)', textTransform: 'capitalize' }}>{log.speaker}: </span>
+                              <span>{log.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {e.carePlan?.riskFlag && (
+                      <div style={{ background: 'color-mix(in srgb, var(--warning) 12%, transparent)', border: '1px solid var(--warning)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: '0.8125rem' }}>
+                        ⚠️ <strong>Risk Flag:</strong> {e.carePlan.riskMessage || 'May napansing alalahanin sa iyong kondisyon.'}
+                      </div>
+                    )}
+
+                    {e.referralTriggered && (
+                      <div style={{ background: 'color-mix(in srgb, #2a6496 10%, transparent)', border: '1px solid #2a6496', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: '0.8125rem' }}>
+                        🏥 <strong>Referral:</strong> Ikaw ay nirefer sa ibang pasilidad para sa susunod na hakbang.
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                  {e.phase !== 'complete' && (
+                    <button className="btn btn-primary" style={{ fontSize: '0.8125rem', padding: '6px 16px' }} onClick={() => router.push(`/navigator/${e.phase}`)}>
+                      Ipagpatuloy ang Bisita →
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.8125rem', padding: '6px 16px', marginLeft: 'auto' }}
+                    onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}
+                  >
+                    {expandedId === e.id ? 'Itago ang Detalye ↑' : 'Tingnan ang Detalye →'}
                   </button>
                 </div>
+
               </div>
             </div>
           ))}
