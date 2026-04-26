@@ -46,7 +46,7 @@ A continuous vertical scroll with four sections:
 3. **Okay Ka Pa Ba? (Follow-Up Intelligence)** — The patient selects their current condition (improving / same / worse). GabAI calls the `/api/gemini/followup` endpoint to generate personalized guidance based on symptoms, medications, and history.
 4. **Community Log** — Collects wait time, doctor helpfulness, and a star rating. Submitted data is saved to the encounter record.
 
-### 📁 Alaala Ko — *Health Memory*
+### 📁 Health Memory — *Alaala Ko*
 - Full encounter history sorted by date, searchable by symptoms, facility, or medicine
 - Inline expandable detail panels per encounter: symptoms, classification, encounter logs (Patient + GabAI turns), document scans, medicines, and risk flags
 - User profile card with editable city, language, and PhilHealth status
