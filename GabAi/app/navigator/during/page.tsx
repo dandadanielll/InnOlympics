@@ -16,6 +16,11 @@ interface RecallInstruction {
 interface RecallResult {
   instructions: RecallInstruction[]
   flagged: string[]
+  referral?: {
+    isReferred: boolean
+    targetSpecialty: string
+    reason: string
+  } | null
   rawInput: string
   processedAt: string
 }
@@ -257,6 +262,7 @@ function RecallAssistantSection() {
       const result: RecallResult = {
         instructions: data.instructions,
         flagged: data.flagged,
+        referral: data.referral || null,
         rawInput: text,
         processedAt: new Date().toISOString(),
       }
@@ -264,13 +270,21 @@ function RecallAssistantSection() {
       setRecallResult(result)
 
       if (currentEncounter) {
-        updateEncounter(currentEncounter.id, {
+        const updates: any = {
           toRemember: data.instructions.map((i: RecallInstruction) => i.instruction),
           encounterLog: [
             ...currentEncounter.encounterLog,
             { speaker: 'Patient', text: text },
-          ],
-        })
+            { speaker: 'GabAi', text: `Narito ang aking nakuha:\n${data.instructions.map((i: RecallInstruction) => `• ${i.instruction}`).join('\n')}` }
+          ]
+        }
+        
+        if (data.referral && data.referral.isReferred) {
+          updates.referralTriggered = true
+          updates.referralData = data.referral
+        }
+        
+        updateEncounter(currentEncounter.id, updates)
       }
     } catch (err) {
       console.error(err)

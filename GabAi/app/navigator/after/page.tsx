@@ -77,11 +77,20 @@ export default function AfterPage() {
   }
 
   const handleStartNew = (isReferral = false) => {
-    const prevSymptoms = encounter?.symptoms || ''
     const newId = createEncounter()
-    if (isReferral && prevSymptoms) {
+    if (isReferral && encounter?.referralData) {
       updateEncounter(newId, {
-        symptoms: `[Referred] ${prevSymptoms}`
+        symptoms: encounter.referralData.reason || `[Referred] ${encounter?.symptoms || ''}`,
+        needType: 'service',
+        classification: {
+          title: encounter.referralData.targetSpecialty,
+          class: 'Referral',
+          risk: 'moderate'
+        }
+      })
+    } else if (isReferral) {
+      updateEncounter(newId, {
+        symptoms: `[Referred] ${encounter?.symptoms || ''}`
       })
     }
     router.push('/navigator/before')
@@ -141,7 +150,7 @@ export default function AfterPage() {
           to { opacity: 1; transform: translateY(0); }
         }
         .bfr{margin:-120px -48px -48px; position:relative; overflow:visible !important}
-        .phase-sec{display:flex;flex-direction:column;min-height:100vh;padding:160px 48px 120px;box-sizing:border-box;transition:opacity .4s,filter .4s;border-bottom:1px solid var(--border-light);overflow:visible !important;align-items:center}
+        .phase-sec{display:flex;flex-direction:column;min-height:100vh;padding:160px 48px 120px;box-sizing:border-box;transition:opacity .4s,filter .4s;overflow:visible !important;align-items:center}
         .phase-main{flex:1;min-width:0;display:flex;flex-direction:column;max-width:1040px;margin:0 auto;width:100%;overflow:visible !important;align-items:center;text-align:center}
         .phase-h1{font-family:'Outfit',sans-serif;font-size:3.5rem;font-weight:800;color:var(--text-primary);margin:0 0 12px;line-height:1.05;letter-spacing:-.04em}
         .phase-p{font-size:.9375rem;color:var(--text-secondary);line-height:1.6;margin:0 0 28px;max-width:800px}
@@ -280,9 +289,9 @@ export default function AfterPage() {
           <h1 className="phase-h1">Susunod na Hakbang</h1>
           <p className="phase-p">Kung ikaw ay nirefer sa ibang pasilidad o laboratoryo, ito ang iyong gabay para sa susunod na hakbang.</p>
           <div className="phase-main-content">
-            {!mountedEncounter || (!mountedEncounter.referralTriggered && mountedEncounter.needType !== 'diagnosis') ? (
-              <div className="card" style={{ width: '100%', maxWidth: '700px', background: 'var(--bg-muted)', border: '1px dashed var(--border)', opacity: 0.6 }}>
-                <div className="card-body" style={{ display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'center' }}>
+            {!mountedEncounter || !mountedEncounter.referralTriggered ? (
+              <div className="card fade-in-up" style={{ width: '100%', maxWidth: '800px', borderTop: '6px solid var(--border)', background: 'var(--bg-base)', padding: '32px', boxShadow: '0 12px 40px rgba(0,0,0,0.08)', opacity: 0.6 }}>
+                <div className="card-body" style={{ display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
                   </svg>
@@ -297,13 +306,14 @@ export default function AfterPage() {
                 className="card fade-in-up" 
                 style={{ 
                   width: '100%', 
-                  maxWidth: '600px', 
-                  border: '2px solid var(--warning)', 
+                  maxWidth: '800px', 
+                  borderTop: '6px solid var(--warning)', 
                   background: 'var(--bg-base)', 
+                  padding: '32px',
+                  boxShadow: '0 12px 40px rgba(0,0,0,0.08)',
                   cursor: 'pointer',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                  padding: '0'
+                  position: 'relative'
                 }}
                 onClick={() => handleStartNew(true)}
                 onMouseEnter={e => {
@@ -312,13 +322,11 @@ export default function AfterPage() {
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = 'var(--shadow-soft)'
+                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,0,0,0.08)'
                 }}
               >
-                <div style={{ background: 'var(--warning)', color: '#fff', padding: '12px', textAlign: 'center', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                  Inirerekomendang Susunod na Hakbang
-                </div>
-                <div className="card-body" style={{ padding: '40px', textAlign: 'center' }}>
+                <div className="card-body" style={{ padding: '0', textAlign: 'center' }}>
+                  <div className="text-xs uppercase" style={{ color: 'var(--warning)', fontWeight: 800, marginBottom: '24px', letterSpacing: '0.1em' }}>Inirerekomendang Susunod na Hakbang</div>
                   <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--warning-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
@@ -332,10 +340,15 @@ export default function AfterPage() {
                   
                   <div className="text-xs uppercase" style={{ color: 'var(--text-muted)', fontWeight: 700, marginBottom: '8px' }}>Serbisyong Kakaingailanganin:</div>
                   <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 16px', lineHeight: 1.2 }}>
-                    {mountedEncounter.classification?.title || 'Specialist Consultation'}
+                    {mountedEncounter.referralData?.targetSpecialty || 'Specialist Consultation'}
                   </h2>
                   <p className="text-sm" style={{ color: 'var(--text-secondary)', marginBottom: '32px', maxWidth: '400px', margin: '0 auto 32px' }}>
-                    I-click ang card na ito para simulan ang paghahanap ng pinakamalapit na pasilidad para sa iyong referral.
+                    I-click ang card na ito para simulan ang paghahanap ng pinakamalapit na pasilidad para sa iyong {mountedEncounter.referralData?.targetSpecialty || 'referral'}.
+                    {mountedEncounter.referralData?.reason && (
+                      <span style={{ display: 'block', marginTop: '8px', fontStyle: 'italic', color: 'var(--warning)' }}>
+                        Dahilan: {mountedEncounter.referralData.reason}
+                      </span>
+                    )}
                   </p>
                   
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--warning)', fontWeight: 700, fontSize: '0.875rem' }}>
@@ -358,7 +371,7 @@ export default function AfterPage() {
               : 'I-update ang iyong lagay para masubaybayan ng GabAi ang iyong pagbabago.'}
           </p>
           <div className="phase-main-content">
-            <div className="card" style={{ width: '100%', maxWidth: '700px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="card fade-in-up" style={{ width: '100%', maxWidth: '800px', borderTop: '6px solid var(--primary)', background: 'var(--bg-base)', padding: '32px', boxShadow: '0 12px 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {!isChatStarted && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {[
@@ -488,8 +501,8 @@ export default function AfterPage() {
           <h1 className="phase-h1">Community Experience Log</h1>
           <p className="phase-p">Ang iyong anonymous na feedback ay tumutulong sa mga susunod na pasyente at sa LGU para mapabuti ang serbisyo.</p>
           <div className="phase-main-content">
-            <div className="card" style={{ width: '100%', maxWidth: '700px' }}>
-              <div className="card-body">
+            <div className="card fade-in-up" style={{ width: '100%', maxWidth: '800px', borderTop: '6px solid var(--primary)', background: 'var(--bg-base)', padding: '32px', boxShadow: '0 12px 40px rgba(0,0,0,0.08)' }}>
+              <div className="card-body" style={{ padding: 0 }}>
                 {!logDone ? (
                   <>
                     <p className="text-sm text-secondary" style={{ marginBottom: '24px' }}>
@@ -658,10 +671,10 @@ export default function AfterPage() {
           <h1 className="phase-h1">Saved to Alaala Ko</h1>
           <p className="phase-p">Ang encounter na ito ay naka-imbak sa iyong device. Awtomatikong gagamitin ng GabAi ang kasaysayang ito para mas maging handa ka sa susunod.</p>
           <div className="phase-main-content">
-            <div className="card" style={{ width: '100%', maxWidth: '700px', background: 'var(--bg-dark)', border: 'none' }}>
-              <div className="card-body">
-                <h3 className="text-h3" style={{ color: '#fff', marginBottom: '8px' }}>Saved to Alaala Ko</h3>
-                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '16px' }}>
+            <div className="card fade-in-up" style={{ width: '100%', maxWidth: '800px', borderTop: '6px solid var(--primary)', background: 'var(--bg-base)', padding: '32px', boxShadow: '0 12px 40px rgba(0,0,0,0.08)' }}>
+              <div className="card-body" style={{ padding: 0, textAlign: 'center' }}>
+                <h3 className="text-h3" style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Saved to Alaala Ko</h3>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
                   Ang encounter na ito ay naka-imbak sa iyong device. Sa susunod mong bisita, awtomatikong gagamitin ng GabAi ang kasaysayang ito para mas maging handa ka.
                 </p>
                 <button
