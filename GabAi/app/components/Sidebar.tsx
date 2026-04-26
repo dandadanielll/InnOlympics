@@ -75,6 +75,7 @@ export default function Sidebar() {
     { name: "Before", href: "/navigator/before" },
     { name: "During", href: "/navigator/during" },
     { name: "After", href: "/navigator/after" },
+    { name: "Alaala", href: "/history" },
   ];
 
   const handleTabEnter = (href: string) => {
@@ -107,9 +108,9 @@ export default function Sidebar() {
       <nav
         ref={navRef}
         className={`relative flex items-center transition-all duration-700 w-full justify-between ${scrolled
-          ? (pathname === '/navigator/before' || pathname === '/navigator/after'
-            ? 'bg-[#f2ecdc]/60 backdrop-blur-xl border-none shadow-lg'
-            : 'bg-[#f2ecdc]/80 backdrop-blur-xl border border-[#510400]/20 shadow-2xl') + ' rounded-full px-10 py-4 max-w-5xl gap-8'
+          ? (pathname === '/navigator/before' || pathname === '/navigator/after' || pathname === '/history'
+            ? 'bg-white/40 backdrop-blur-2xl border border-white/20 shadow-[0_8px_32px_rgba(81,4,0,0.12)]'
+            : 'bg-[#f2ecdc]/50 backdrop-blur-2xl border border-[#510400]/20 shadow-2xl') + ' rounded-full px-10 py-4 max-w-5xl gap-8'
           : (pathname === '/navigator/before'
             ? 'border-none'
             : 'border-none') + ` px-10 py-8 w-full ${pathname === '/' ? 'max-w-full' : 'max-w-7xl'} gap-12`

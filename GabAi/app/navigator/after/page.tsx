@@ -150,7 +150,7 @@ export default function AfterPage() {
           to { opacity: 1; transform: translateY(0); }
         }
         .bfr{margin:-120px -48px -48px; position:relative; overflow:visible !important}
-        .phase-sec{display:flex;flex-direction:column;min-height:100vh;padding:160px 48px 120px;box-sizing:border-box;transition:opacity .4s,filter .4s;overflow:visible !important;align-items:center}
+        .phase-sec{display:flex;flex-direction:column;min-height:100vh;padding:240px 48px 120px;box-sizing:border-box;transition:opacity .4s,filter .4s;border-bottom:1px solid var(--border-light);overflow:visible !important;align-items:center;margin-bottom:80px}
         .phase-main{flex:1;min-width:0;display:flex;flex-direction:column;max-width:1040px;margin:0 auto;width:100%;overflow:visible !important;align-items:center;text-align:center}
         .phase-h1{font-family:'Outfit',sans-serif;font-size:3.5rem;font-weight:800;color:var(--text-primary);margin:0 0 12px;line-height:1.05;letter-spacing:-.04em}
         .phase-p{font-size:.9375rem;color:var(--text-secondary);line-height:1.6;margin:0 0 28px;max-width:800px}
