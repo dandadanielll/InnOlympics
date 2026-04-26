@@ -25,7 +25,6 @@ GabAI solves all of this in one app.
 - **Symptom Classification** — Describe your symptom or needed service in plain language; Gemini AI classifies the urgency and target department. Falls back to a local rule-based classifier (from `conditions.ts` + `services.ts`) when API quota runs out.
 - **Facility Finder** — Finds the nearest BHC, RHU, hospital, or clinic from a curated Metro Manila dataset, ranked by a relevance + distance scoring algorithm. Filters: PhilHealth accredited, walk-in, 24/7 emergency, Malasakit Center, senior/PWD lane, and more.
 - **Commute Planner** — Generates a multi-leg commute route (Walk → Tricycle → Jeepney → LRT/MRT → Bus) using OSRM for real road distances, with LTFRB 2024 official fare computations. Displays an interactive Leaflet.js map with the route polyline.
-- **Script Generator** — Drafts what the patient should say to the doctor, pre-filled from their symptom input.
 - **Document Checklist** — Context-aware list of what to bring (PhilHealth card, valid ID, referral slip, etc.), generated based on facility type and symptom classification.
 - **PGH Queue Estimates** — Real wait-time estimates for Philippine General Hospital departments sourced from `pgh_estimates.ts`.
 
