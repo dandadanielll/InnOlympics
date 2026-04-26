@@ -61,6 +61,11 @@ export interface Encounter {
   phase: 'before' | 'during' | 'after' | 'complete'
   facilityId: string
   referralTriggered: boolean
+  referralData?: {
+    isReferred: boolean
+    targetSpecialty: string
+    reason: string
+  } | null
   followUpStatus: 'pending' | 'improving' | 'flagged'
   communityRating?: {
     waitTime: number

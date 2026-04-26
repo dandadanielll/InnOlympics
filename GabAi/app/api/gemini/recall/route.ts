@@ -51,7 +51,12 @@ Output MUST be valid JSON matching this schema:
       "confidence": "clear"
     }
   ],
-  "flagged": []
+  "flagged": [],
+  "referral": {
+    "isReferred": true,
+    "targetSpecialty": "Pulmonologist",
+    "reason": "Para sa ubo"
+  } // Set to null if there is no explicit referral mentioned.
 }
 `
 
